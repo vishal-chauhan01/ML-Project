@@ -1,0 +1,30 @@
+{
+  "linear": {
+    "accuracy": "98.8%",
+    "mae": "\u20b915.14",
+    "rmse": "\u20b920.25",
+    "r2Score": "0.988",
+    "directionalAccuracy": "49.3%"
+  },
+  "polynomial": {
+    "accuracy": "61.4%",
+    "mae": "\u20b968.47",
+    "rmse": "\u20b9114.40",
+    "r2Score": "0.614",
+    "directionalAccuracy": "50.2%"
+  },
+  "rbf": {
+    "accuracy": "94.5%",
+    "mae": "\u20b935.88",
+    "rmse": "\u20b943.19",
+    "r2Score": "0.945",
+    "directionalAccuracy": "50.9%"
+  },
+  "rf": {
+    "accuracy": "99.0%",
+    "mae": "\u20b913.31",
+    "rmse": "\u20b918.05",
+    "r2Score": "0.990",
+    "directionalAccuracy": "48.6%"
+  }
+}
