@@ -165,7 +165,7 @@ Open application in browser: [http://localhost:5173](http://localhost:5173)
 - **Framework Preset**: `Vite`
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist`
-- **Environment Variable**: `VITE_API_URL=https://your-backend.onrender.com/api`
+- **Environment Variable**: `VITE_API_URL=https://ml-project-e9et.onrender.com/api`
 
 ---
 
