@@ -1,5 +1,13 @@
 # ShareWise AI — Real-Time Multi-Model Stock Analytics & Prediction Engine
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?style=for-the-badge&logo=vercel)](https://ml-project-xi.vercel.app/)
+[![Backend API](https://img.shields.io/badge/FastAPI_Backend-Render-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://ml-project-e9et.onrender.com/api/stocks)
+
+🔗 **Live Deployments**:
+- 🌐 **Frontend Application**: [https://ml-project-xi.vercel.app/](https://ml-project-xi.vercel.app/)
+- ⚙️ **FastAPI Backend API**: [https://ml-project-e9et.onrender.com/api](https://ml-project-e9et.onrender.com/api)
+- 📚 **Swagger API Docs**: [https://ml-project-e9et.onrender.com/docs](https://ml-project-e9et.onrender.com/docs)
+
 ShareWise AI is a full-stack, machine-learning-powered financial analytics platform. It integrates live stock market data via `yfinance` into a high-performance **Python FastAPI** backend serving four trained machine learning regression models (Linear Regression, Polynomial Regression, RBF SVR, and Random Forest), rendered on a responsive **React + Vite + TypeScript** frontend.
 
 ---
