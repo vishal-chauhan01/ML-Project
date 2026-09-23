@@ -65,11 +65,11 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
 
       {/* Control Actions Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
           {/* Stock Select Dropdown */}
-          <div className="relative inline-block text-left">
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition-colors">
-              <div className="w-7 h-7 ml-3 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center">
+          <div className="relative w-full sm:w-auto text-left">
+            <div className="flex items-center w-full bg-white border border-slate-200 rounded-xl shadow-2xs hover:border-slate-300 transition-colors">
+              <div className="w-7 h-7 ml-3 shrink-0 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center">
                 {selectedStock.symbol.charAt(0)}
               </div>
               <select
@@ -78,7 +78,7 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
                   const found = stocks.find((s) => s.id === e.target.value);
                   if (found) onSelectStock(found);
                 }}
-                className="appearance-none bg-transparent pl-2.5 pr-8 py-2 text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer"
+                className="w-full appearance-none bg-transparent pl-2.5 pr-8 py-2 text-sm font-semibold text-slate-900 focus:outline-none cursor-pointer"
               >
                 {stocks.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -91,7 +91,7 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
           </div>
 
           {/* Search Input Bar */}
-          <div className="relative min-w-[220px] max-w-sm">
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-sm">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -104,7 +104,7 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
         </div>
 
         {/* Prediction Update Info */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium self-end sm:self-auto">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium self-start sm:self-auto">
           <span>Predictions updated 5 min ago</span>
           <Info className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-600" />
         </div>

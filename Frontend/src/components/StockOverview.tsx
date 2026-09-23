@@ -47,7 +47,7 @@ export const StockOverview: React.FC<StockOverviewProps> = ({ stock }) => {
         </div>
 
         {/* Right Section: Today's Range, Volume, Market Cap */}
-        <div className="flex flex-wrap items-center gap-8 md:gap-12 border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:items-center gap-4 sm:gap-8 md:gap-12 border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
           <div>
             <span className="block text-xs text-slate-400 font-medium mb-1">Today's range</span>
             <span className="text-sm font-semibold text-slate-900">{stock.todaysRange}</span>
@@ -56,7 +56,7 @@ export const StockOverview: React.FC<StockOverviewProps> = ({ stock }) => {
             <span className="block text-xs text-slate-400 font-medium mb-1">Volume</span>
             <span className="text-sm font-semibold text-slate-900">{stock.volume}</span>
           </div>
-          <div>
+          <div className="col-span-2 sm:col-span-1">
             <span className="block text-xs text-slate-400 font-medium mb-1">Market cap</span>
             <span className="text-sm font-semibold text-slate-900">{stock.marketCap}</span>
           </div>

@@ -219,7 +219,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
               <p className="text-xs text-slate-500 leading-relaxed">{model.description}</p>
 
               {/* Metrics Grid */}
-              <div className="grid grid-cols-5 gap-1.5 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold block">R² Accuracy</span>
                   <span className="text-xs font-extrabold text-blue-600">{model.accuracy}</span>
