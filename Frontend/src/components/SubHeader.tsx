@@ -28,15 +28,15 @@ export const SubHeader: React.FC<SubHeaderProps> = ({
           <div className="flex items-center gap-2 mb-1">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              US MARKET OPEN
+              INDIA MARKET OPEN
             </span>
             <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
-              9:30 AM — 4:00 PM EST
+              9:15 AM – 3:30 PM IST
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            Good morning, Vishal
+            Good morning
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Explore AI-powered predictions for your favorite stocks.

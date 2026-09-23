@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, TrendingUp } from 'lucide-react';
+import { Bell, TrendingUp, User } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
           <Bell className="w-5 h-5" />
         </button>
         <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 font-semibold text-xs flex items-center justify-center border border-blue-200 shadow-xs">
-          VC
+          <User className="w-4 h-4 text-blue-700" />
         </div>
       </div>
     </header>
