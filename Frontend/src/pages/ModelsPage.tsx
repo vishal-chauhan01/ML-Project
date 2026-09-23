@@ -250,16 +250,16 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="border-b border-slate-200/80 pb-5">
+      <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-5">
         <div className="flex items-center gap-2.5 mb-1">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 dark:bg-blue-600 text-white flex items-center justify-center shadow-xs">
             <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
               ML Model Comparison & Benchmark Suite
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Comprehensive statistical performance metrics, side-by-side model matrix, and live inference sandbox.
             </p>
           </div>
@@ -268,70 +268,70 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
       {/* Top Model Performance Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-2xs transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Best R² Accuracy</span>
-            <Award className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Best R² Accuracy</span>
+            <Award className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900">{bestR2Model.r2Accuracy}</div>
-          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 mt-1 inline-block">
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white">{bestR2Model.r2Accuracy}</div>
+          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800 mt-1 inline-block">
             {bestR2Model.name}
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-2xs transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Lowest Prediction MAE</span>
-            <TrendingUp className="w-4 h-4 text-purple-600" />
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Lowest Prediction MAE</span>
+            <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900">{lowestMaeModel.mae}</div>
-          <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 mt-1 inline-block">
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white">{lowestMaeModel.mae}</div>
+          <span className="text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 mt-1 inline-block">
             {lowestMaeModel.name}
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-2xs transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Fastest Inference</span>
-            <Zap className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Fastest Inference</span>
+            <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900">12 ms</div>
-          <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 mt-1 inline-block">
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white">12 ms</div>
+          <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800 mt-1 inline-block">
             Linear OLS Baseline
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-2xs transition-colors">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Best Directional Acc</span>
-            <BarChart3 className="w-4 h-4 text-amber-600" />
+            <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Best Directional Acc</span>
+            <BarChart3 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-extrabold text-slate-900">{bestDirModel.directionalAccuracy}</div>
-          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 mt-1 inline-block">
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white">{bestDirModel.directionalAccuracy}</div>
+          <span className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-100 dark:border-amber-800 mt-1 inline-block">
             {bestDirModel.name}
           </span>
         </div>
       </div>
 
       {/* Interactive Live Model Inference Sandbox Banner (Below KPI Cards) */}
-      <div className="bg-white rounded-2xl border border-blue-200 p-6 shadow-xs relative overflow-hidden">
-        <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-wider mb-4">
-          <Zap className="w-4 h-4 fill-blue-600 text-blue-600" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-200 dark:border-blue-900/60 p-6 shadow-xs relative overflow-hidden transition-colors">
+        <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-4">
+          <Zap className="w-4 h-4 fill-blue-600 text-blue-600 dark:fill-blue-400 dark:text-blue-400" />
           Interactive Live Model Inference Sandbox
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
           {/* Select Stock */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Select Stock</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Select Stock</label>
             <select
               value={selectedStockId}
               onChange={(e) => setSelectedStockId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
             >
-              {stocks.length === 0 && <option value="">No stocks available</option>}
+              {stocks.length === 0 && <option value="" className="bg-white dark:bg-slate-900">No stocks available</option>}
               {stocks.map((s) => (
-                <option key={s.id} value={s.id}>
+                <option key={s.id} value={s.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                   {s.symbol} · {s.name}
                 </option>
               ))}
@@ -340,14 +340,14 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
           {/* Select Model */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Select AI Model</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Select AI Model</label>
             <select
               value={selectedModelId}
               onChange={(e) => setSelectedModelId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
             >
               {benchmarkModels.map((m) => (
-                <option key={m.id} value={m.id}>
+                <option key={m.id} value={m.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                   {m.name}
                 </option>
               ))}
@@ -356,15 +356,15 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
           {/* Select Horizon */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Horizon Timeframe</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Horizon Timeframe</label>
             <select
               value={selectedTimeframe}
               onChange={(e) => setSelectedTimeframe(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-blue-500"
             >
-              <option value="7D">7 Days Horizon</option>
-              <option value="30D">30 Days Horizon</option>
-              <option value="90D">90 Days Horizon</option>
+              <option value="7D" className="bg-white dark:bg-slate-900">7 Days Horizon</option>
+              <option value="30D" className="bg-white dark:bg-slate-900">30 Days Horizon</option>
+              <option value="90D" className="bg-white dark:bg-slate-900">90 Days Horizon</option>
             </select>
           </div>
 
@@ -373,7 +373,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
             <button
               onClick={handleRunInference}
               disabled={inferring || !selectedStockId || !selectedModelId}
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {inferring ? (
                 <>
@@ -392,25 +392,25 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
         {/* Inference Results Output */}
         {inferenceResult && (
-          <div className="mt-4 pt-4 border-t border-slate-100 bg-purple-50/60 rounded-xl p-4 border border-purple-100">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 bg-purple-50/60 dark:bg-purple-950/40 rounded-xl p-4 border border-purple-100 dark:border-purple-900/60">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 uppercase">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 uppercase">
                     {inferenceResult.stockSymbol}
                   </span>
-                  <span className="text-xs font-semibold text-slate-600">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                     Model: <strong>{inferenceResult.modelName}</strong>
                   </span>
                 </div>
                 <div className="flex items-baseline gap-3">
-                  <span className="text-2xl font-extrabold text-slate-900">
+                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
                     {inferenceResult.projectedPrice}
                   </span>
-                  <span className="text-sm font-bold text-emerald-600">
+                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                     {inferenceResult.percentageChange}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     (Current: {inferenceResult.currentPrice})
                   </span>
                 </div>
@@ -418,14 +418,14 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
               <div className="flex items-center gap-6">
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">Model Confidence</span>
-                  <span className="text-sm font-extrabold text-emerald-700">
+                  <span className="text-xs text-slate-400 dark:text-slate-500 block font-medium">Model Confidence</span>
+                  <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
                     {inferenceResult.confidence}%
                   </span>
                 </div>
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">Signal</span>
-                  <span className="text-xs font-bold text-purple-700">
+                  <span className="text-xs text-slate-400 dark:text-slate-500 block font-medium">Signal</span>
+                  <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
                     {inferenceResult.signal}
                   </span>
                 </div>
@@ -436,24 +436,24 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
       </div>
 
       {/* SECTION 1: Interactive Model Comparison Chart (Bar Graphs) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-xs space-y-5 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               Model Performance Benchmark Chart
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               Select metric to compare models visually across statistical evaluation criteria
             </p>
           </div>
 
           {/* Metric Selector Tabs */}
-          <div className="flex flex-wrap items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold">
+          <div className="flex flex-wrap items-center bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold">
             <button
               onClick={() => setSelectedMetric('r2')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                selectedMetric === 'r2' ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                selectedMetric === 'r2' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               R² Accuracy (%)
@@ -461,7 +461,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
             <button
               onClick={() => setSelectedMetric('dir')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                selectedMetric === 'dir' ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                selectedMetric === 'dir' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               Directional Acc (%)
@@ -469,7 +469,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
             <button
               onClick={() => setSelectedMetric('mae')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                selectedMetric === 'mae' ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                selectedMetric === 'mae' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               MAE (₹ Lower Better)
@@ -477,7 +477,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
             <button
               onClick={() => setSelectedMetric('rmse')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                selectedMetric === 'rmse' ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                selectedMetric === 'rmse' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs font-bold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               RMSE (₹ Lower Better)
@@ -515,21 +515,21 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
                 <div className="flex items-center justify-between text-xs font-semibold">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }}></span>
-                    <span className="text-slate-800 font-bold">{m.name}</span>
-                    <span className="text-slate-400 text-[11px]">({m.type})</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-bold">{m.name}</span>
+                    <span className="text-slate-400 dark:text-slate-500 text-[11px]">({m.type})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {isBest && (
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
                         Rank #1 Best
                       </span>
                     )}
-                    <span className="text-slate-900 font-extrabold text-sm">{displayVal}</span>
+                    <span className="text-slate-900 dark:text-white font-extrabold text-sm">{displayVal}</span>
                   </div>
                 </div>
 
                 {/* Progress bar container */}
-                <div className="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden relative">
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-3.5 rounded-full overflow-hidden relative">
                   <div
                     className="h-full rounded-full transition-all duration-700"
                     style={{
@@ -545,28 +545,28 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
       </div>
 
       {/* SECTION 2: Multi-Model Price Trajectory Overlay Chart */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-xs space-y-4 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-purple-600" />
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               Multi-Model Trajectory Overlay Visualizer
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               Simultaneous 7-day forecast comparison curves across all 4 machine learning models
             </p>
           </div>
 
           {/* Stock Selector for Trajectory Overlay */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Stock:</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Stock:</span>
             <select
               value={comparisonStockId}
               onChange={(e) => setComparisonStockId(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
             >
               {stocks.map((s) => (
-                <option key={s.id} value={s.id}>
+                <option key={s.id} value={s.id} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
                   {s.symbol} · {s.name}
                 </option>
               ))}
@@ -575,9 +575,9 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center justify-end gap-4 text-xs font-semibold text-slate-600 pt-1">
+        <div className="flex flex-wrap items-center justify-end gap-4 text-xs font-semibold text-slate-600 dark:text-slate-400 pt-1">
           <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-1.5 bg-slate-400 rounded-full"></span>
+            <span className="w-3.5 h-1.5 bg-slate-400 dark:bg-slate-500 rounded-full"></span>
             <span>Historical</span>
           </div>
           {benchmarkModels.map((m) => (
@@ -596,8 +596,8 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
               const y = getCompY(tick);
               return (
                 <g key={idx}>
-                  <line x1={compPadX} y1={y} x2={compWidth - compPadX} y2={y} stroke="#f1f5f9" strokeWidth="1" />
-                  <text x={compPadX - 8} y={y + 4} fill="#94a3b8" fontSize="10" fontWeight="500" textAnchor="end">
+                  <line x1={compPadX} y1={y} x2={compWidth - compPadX} y2={y} stroke="currentColor" className="text-slate-100 dark:text-slate-800/80" strokeWidth="1" />
+                  <text x={compPadX - 8} y={y + 4} className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium" textAnchor="end">
                     {activeComparisonStock?.exchange === 'NSE' || activeComparisonStock?.symbol.endsWith('.NS') || activeComparisonStock?.id === 'reliance' ? '₹' : '$'}{tick}
                   </text>
                 </g>
@@ -638,7 +638,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
                     <line x1={x} y1={compPadY} x2={x} y2={compHeight - compPadY} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
                   )}
                   <circle cx={x} cy={getCompY(pt.historical !== undefined ? pt.historical : pt.forecast!)} r={isHovered ? 5 : 3.5} fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
-                  <text x={x} y={compHeight - 5} fill="#94a3b8" fontSize="10" fontWeight="500" textAnchor="middle">
+                  <text x={x} y={compHeight - 5} className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium" textAnchor="middle">
                     {pt.date}
                   </text>
                 </g>
@@ -649,21 +649,21 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
       </div>
 
       {/* SECTION 3: Side-by-Side Model Comparison Matrix Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-        <div className="border-b border-slate-100 pb-3">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-emerald-600" />
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-xs space-y-4 transition-colors">
+        <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             Model Specification Matrix Table
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
             Architectural characteristics, latency metrics, and regime recommendations
           </p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
+          <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 font-semibold uppercase tracking-wider">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                 <th className="py-3 px-4">Model Name</th>
                 <th className="py-3 px-4">R² Score</th>
                 <th className="py-3 px-4">Dir. Accuracy</th>
@@ -674,24 +674,24 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
                 <th className="py-3 px-4">Best Market Scenario</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {benchmarkModels.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50/80 transition-colors font-medium">
-                  <td className="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2">
+                <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors font-medium">
+                  <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }}></span>
                     {m.name}
                   </td>
-                  <td className="py-3.5 px-4 font-extrabold text-blue-600">{m.r2Accuracy}</td>
-                  <td className="py-3.5 px-4 font-extrabold text-purple-600">{m.directionalAccuracy}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-800">{m.mae}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-800">{m.rmse}</td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-600">{m.latency}</td>
+                  <td className="py-3.5 px-4 font-extrabold text-blue-600 dark:text-blue-400">{m.r2Accuracy}</td>
+                  <td className="py-3.5 px-4 font-extrabold text-purple-600 dark:text-purple-400">{m.directionalAccuracy}</td>
+                  <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-slate-200">{m.mae}</td>
+                  <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-slate-200">{m.rmse}</td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-600 dark:text-slate-400">{m.latency}</td>
                   <td className="py-3.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.overfitRisk === 'Low' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${m.overfitRisk === 'Low' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'}`}>
                       {m.overfitRisk}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-slate-600 font-medium">{m.bestUse}</td>
+                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-medium">{m.bestUse}</td>
                 </tr>
               ))}
             </tbody>
@@ -700,36 +700,36 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
       </div>
 
       {/* SECTION 4: Feature Importance Breakdown */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
-        <div className="border-b border-slate-100 pb-3">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-xs space-y-4 transition-colors">
+        <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-500" />
             Model Feature Importance & Weight Allocation
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
             Technical indicator weights used by each machine learning model during inference
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {benchmarkModels.map((m) => (
-            <div key={m.id} className="bg-slate-50/70 border border-slate-200/70 rounded-xl p-4 space-y-3">
+            <div key={m.id} className="bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/70 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }}></span>
                   {m.name}
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{m.type}</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{m.type}</span>
               </div>
 
               <div className="space-y-2 pt-1">
                 {m.features.map((feat, fIdx) => (
                   <div key={fIdx} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold text-slate-600">
+                    <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-300">
                       <span>{feat.name}</span>
-                      <span className="font-extrabold text-slate-800">{feat.weight}%</span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-100">{feat.weight}%</span>
                     </div>
-                    <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-200/80 dark:bg-slate-700/80 h-2 rounded-full overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${feat.weight}%`, backgroundColor: m.color }}></div>
                     </div>
                   </div>

@@ -101,12 +101,12 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
   return (
     <div className="mb-6 space-y-4">
       {/* Model Selection Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors">
         <div className="flex items-center gap-2">
-          <Cpu className="w-5 h-5 text-blue-600" />
+          <Cpu className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <div>
-            <h3 className="text-sm font-bold text-slate-900 leading-none">Active ML Model Engine</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Direct FastAPI Python ML Inference</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Active ML Model Engine</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Direct FastAPI Python ML Inference</p>
           </div>
         </div>
 
@@ -120,14 +120,14 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                 onClick={() => onSelectModelType(m.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
                   isSelected
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100'
+                    ? 'bg-blue-600 dark:bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-blue-600'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
                 <div className="text-left">
                   <div className="leading-tight">{m.label}</div>
-                  <div className={`text-[9px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                  <div className={`text-[9px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'}`}>
                     {m.tag}
                   </div>
                 </div>
@@ -140,15 +140,15 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
       {/* Section Header & Timeframe Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">Price prediction</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Price prediction</h2>
+          <p className="text-sm text-slate-400 dark:text-slate-400">
             Historical performance and projected price range using{' '}
-            <strong className="text-blue-600 uppercase">{activeModelType}</strong> model
+            <strong className="text-blue-600 dark:text-blue-400 uppercase">{activeModelType}</strong> model
           </p>
         </div>
 
         {/* Timeframe Selector Pills */}
-        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 self-start sm:self-auto">
+        <div className="flex items-center bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 self-start sm:self-auto">
           {timeframes.map((tf) => {
             const isActive = activeTimeframe === tf;
             return (
@@ -157,8 +157,8 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                 onClick={() => onSelectTimeframe(tf)}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                   isActive
-                    ? 'bg-white text-blue-600 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 {tf}
@@ -171,16 +171,16 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
       {/* Grid: Chart Card + AI Forecast Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Chart Card */}
-        <div className="lg:col-span-2 min-w-0 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-2 min-w-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-xs flex flex-col justify-between transition-colors">
           {/* Legend */}
           <div className="flex items-center justify-end gap-6 mb-2 text-xs font-semibold">
             <div className="flex items-center gap-2">
-              <span className="w-4 h-[2.5px] bg-blue-600 rounded-full"></span>
-              <span className="text-slate-500">Historical</span>
+              <span className="w-4 h-[2.5px] bg-blue-600 dark:bg-blue-400 rounded-full"></span>
+              <span className="text-slate-500 dark:text-slate-400">Historical</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-4 h-[2.5px] bg-purple-500 rounded-full border-b border-dashed border-purple-500"></span>
-              <span className="text-slate-500">
+              <span className="w-4 h-[2.5px] bg-purple-500 dark:bg-purple-400 rounded-full border-b border-dashed border-purple-500"></span>
+              <span className="text-slate-500 dark:text-slate-400">
                 {activeModelType.toUpperCase()} Forecast
               </span>
             </div>
@@ -209,15 +209,14 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                       y1={y}
                       x2={width - paddingX}
                       y2={y}
-                      stroke="#f1f5f9"
+                      stroke="currentColor"
+                      className="text-slate-100 dark:text-slate-800/80"
                       strokeWidth="1"
                     />
                     <text
                       x={paddingX - 10}
                       y={y + 4}
-                      fill="#94a3b8"
-                      fontSize="10"
-                      fontWeight="500"
+                      className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium"
                       textAnchor="end"
                     >
                       {stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance' ? '₹' : '$'}{tickVal}
@@ -291,9 +290,7 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                     <text
                       x={x}
                       y={height - 5}
-                      fill="#94a3b8"
-                      fontSize="10"
-                      fontWeight="500"
+                      className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium"
                       textAnchor="middle"
                     >
                       {pt.date}
@@ -328,9 +325,9 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
           </div>
 
           {/* Chart Footer info */}
-          <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 text-xs font-medium text-slate-400">
+          <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-medium text-slate-400 dark:text-slate-500">
             <span>Current {stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance' ? '₹' : '$'}{stock.currentPrice.toFixed(2)}</span>
-            <div className="flex items-center gap-1 text-emerald-600 font-semibold">
+            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{currentForecast.currentVsForecastLabel}</span>
             </div>
@@ -338,43 +335,43 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
         </div>
 
         {/* Right AI Forecast Card */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-xs flex flex-col justify-between transition-colors">
           <div className="space-y-6">
             {/* Top Row: Icon + Label + Confidence Badge */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-100 dark:border-purple-800/60 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-2xs">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 leading-tight">AI forecast</h3>
-                  <span className="text-xs text-slate-400 font-medium">
+                  <h3 className="font-bold text-slate-900 dark:text-white leading-tight">AI forecast</h3>
+                  <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
                     {activeTimeframe} outlook
                   </span>
                 </div>
               </div>
-              <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800">
                 {currentForecast.confidence}% confidence
               </span>
             </div>
 
             {/* Projected Price & % Change */}
             <div className="pt-2">
-              <span className="text-xs font-medium text-slate-400 block mb-1">
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mb-1">
                 Projected price
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                <span className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   {currentForecast.projectedPrice}
                 </span>
-                <span className="text-sm font-bold text-emerald-600">
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                   {currentForecast.percentageChange}
                 </span>
               </div>
             </div>
 
             {/* Confidence Progress Bar */}
-            <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
               <div
                 className="bg-emerald-500 h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(currentForecast.confidence, 100)}%` }}
@@ -383,8 +380,8 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
 
             {/* Signal */}
             <div className="pt-1">
-              <span className="text-xs font-medium text-slate-400 block mb-0.5">Signal</span>
-              <span className="text-base font-bold text-slate-900">
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mb-0.5">Signal</span>
+              <span className="text-base font-bold text-slate-900 dark:text-white">
                 {currentForecast.signal}
               </span>
             </div>

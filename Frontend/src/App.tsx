@@ -9,6 +9,7 @@ import { Footer } from './components/Footer';
 import { WatchlistPage } from './pages/WatchlistPage';
 import { MarketInsightsPage } from './pages/MarketInsightsPage';
 import { ModelsPage } from './pages/ModelsPage';
+import { AboutPage } from './pages/AboutPage';
 import { apiService } from './services/api';
 import type { Stock, Timeframe } from './types/stock';
 
@@ -83,7 +84,7 @@ export function App() {
     : stocks;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col antialiased">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#090d16] text-slate-900 dark:text-slate-100 font-sans flex flex-col antialiased transition-colors">
       {/* Navigation Header */}
       <Header activeTab={activeTab} setActiveTab={handleTabChange} />
 
@@ -121,7 +122,7 @@ export function App() {
                     </div>
                   </>
                 ) : (
-                  <div className="py-20 text-center text-slate-500 font-semibold bg-white rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="py-20 text-center text-slate-500 dark:text-slate-400 font-semibold bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs transition-colors">
                     No active stock data found. Please start Python FastAPI backend engine.
                   </div>
                 )}
@@ -150,6 +151,16 @@ export function App() {
             {activeTab === 'models' && (
               <div>
                 <ModelsPage stocks={stocks} />
+                <Footer />
+              </div>
+            )}
+
+            {activeTab === 'about' && (
+              <div>
+                <AboutPage
+                  onNavigateToOverview={() => handleTabChange('overview')}
+                  onNavigateToModels={() => handleTabChange('models')}
+                />
                 <Footer />
               </div>
             )}

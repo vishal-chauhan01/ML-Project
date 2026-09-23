@@ -609,10 +609,10 @@ def get_market_insights(ticker: str = "RELIANCE.NS", model_type: str = Query("li
                 {
                     "symbol": ticker,
                     "title": f"Real-Time {m_name} Indicator Analysis",
-                    "rsi": f"RSI (14): {latest_row['RSI_14']:.2f}",
-                    "macd": f"MACD: {latest_row['MACD']:.2f}",
-                    "ma20": f"20-Day SMA: ₹{latest_row['SMA_20']:.2f}",
-                    "bollinger": f"SMA20 Ratio: {latest_row['Close_SMA20_Ratio']:.4f}",
+                    "rsi": f"{latest_row['RSI_14']:.2f}",
+                    "macd": f"{latest_row['MACD']:.2f}",
+                    "ma20": f"₹{latest_row['SMA_20']:.2f}",
+                    "bollinger": f"{latest_row['Close_SMA20_Ratio']:.4f}",
                     "summary": f"The {m_name} evaluates real-time upside target at ₹{pred_next_close:.2f} ({exp_pct:+.2f}%)."
                 }
             ]
