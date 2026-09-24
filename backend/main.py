@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import pandas as pd
 import numpy as np
 import pickle
@@ -45,6 +45,71 @@ stock_cache: Dict[str, Any] = {}
 stock_cache_time: float = 0.0
 CACHE_TTL_SECONDS = 60.0
 
+
+# ============================================================
+# IN-MEMORY THREAD-SAFE RESPONSE CACHE ENGINE
+# ============================================================
+class TTLResponseCache:
+    """Thread-safe in-memory TTL response cache to protect against upstream yfinance rate limits."""
+    def __init__(self, default_ttl_seconds: float = 300.0, max_size: int = 1000):
+        self._cache: Dict[str, Tuple[float, Any]] = {}
+        self._lock = threading.Lock()
+        self.default_ttl = default_ttl_seconds
+        self.max_size = max_size
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: str) -> Optional[Any]:
+        now = time.time()
+        with self._lock:
+            if key in self._cache:
+                timestamp, data = self._cache[key]
+                if (now - timestamp) < self.default_ttl:
+                    self.hits += 1
+                    return data
+                else:
+                    del self._cache[key]
+            self.misses += 1
+            return None
+
+    def set(self, key: str, data: Any, ttl: Optional[float] = None) -> None:
+        now = time.time()
+        effective_ttl = ttl if ttl is not None else self.default_ttl
+        with self._lock:
+            if len(self._cache) >= self.max_size:
+                expired_keys = [k for k, (ts, _) in self._cache.items() if (now - ts) >= effective_ttl]
+                for k in expired_keys:
+                    del self._cache[k]
+                if len(self._cache) >= self.max_size:
+                    oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][0])
+                    del self._cache[oldest_key]
+            self._cache[key] = (now, data)
+
+    def invalidate(self, prefix: str = "") -> int:
+        with self._lock:
+            if not prefix:
+                count = len(self._cache)
+                self._cache.clear()
+                return count
+            keys_to_del = [k for k in self._cache.keys() if k.startswith(prefix)]
+            for k in keys_to_del:
+                del self._cache[k]
+            return len(keys_to_del)
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            total = self.hits + self.misses
+            hit_pct = f"{(self.hits / total * 100):.1f}%" if total > 0 else "0.0%"
+            return {
+                "active_items": len(self._cache),
+                "hits": self.hits,
+                "misses": self.misses,
+                "hit_rate": hit_pct,
+                "default_ttl_seconds": self.default_ttl
+            }
+
+response_cache = TTLResponseCache(default_ttl_seconds=300.0, max_size=1000)
+
 # ============================================================
 # PATHS & RESOURCE LOADERS (pointing to model/ directory)
 # ============================================================
@@ -59,7 +124,9 @@ MODEL_FILES = {
 }
 
 FEATURES_PATH = os.path.join(MODEL_DIR, "reliance_model_features.pkl")
-CSV_PATH = os.path.join(MODEL_DIR, "historical_stock_data.csv")
+CSV_PATH = os.path.join(BASE_DIR, "historical_stock_data.csv")
+if not os.path.exists(CSV_PATH):
+    CSV_PATH = os.path.join(MODEL_DIR, "historical_stock_data.csv")
 METRICS_PATH = os.path.join(MODEL_DIR, "model_metrics.json")
 
 # Loaded Models & Resources Cache
@@ -74,67 +141,87 @@ saved_watchlist_ids = set(["reliance", "RELIANCE.NS"])
 
 
 def compute_technical_features(data: pd.DataFrame) -> pd.DataFrame:
-    """Computes technical features for regression models."""
+    """Computes 36 scale-invariant technical features for log return regression models."""
     df = data.copy()
     
-    # Returns
-    df["Return_1"] = df["Close"].pct_change(1)
-    df["Return_2"] = df["Close"].pct_change(2)
-    df["Return_3"] = df["Close"].pct_change(3)
-    df["Return_5"] = df["Close"].pct_change(5)
-    df["Return_10"] = df["Close"].pct_change(10)
+    # 1. Multi-Period Returns & Log Return Lags
+    for n in [1, 2, 3, 5, 10, 20]:
+        df[f"Return_{n}"] = df["Close"].pct_change(n)
+        
+    df["Log_Return_Lag_1"] = np.log(df["Close"] / df["Close"].shift(1))
+    df["Log_Return_Lag_2"] = np.log(df["Close"].shift(1) / df["Close"].shift(2))
+    df["Log_Return_Lag_3"] = np.log(df["Close"].shift(2) / df["Close"].shift(3))
+    df["Log_Return_Lag_5"] = np.log(df["Close"].shift(4) / df["Close"].shift(5))
     
-    # Lagged Prices
-    df["Close_Lag_1"] = df["Close"].shift(1)
-    df["Close_Lag_2"] = df["Close"].shift(2)
-    df["Close_Lag_3"] = df["Close"].shift(3)
-    df["Close_Lag_5"] = df["Close"].shift(5)
-    
-    # Moving Averages
-    df["SMA_5"] = df["Close"].rolling(window=5).mean()
-    df["SMA_10"] = df["Close"].rolling(window=10).mean()
-    df["SMA_20"] = df["Close"].rolling(window=20).mean()
-    df["SMA_50"] = df["Close"].rolling(window=50).mean()
-    
-    df["EMA_10"] = df["Close"].ewm(span=10, adjust=False).mean()
-    df["EMA_20"] = df["Close"].ewm(span=20, adjust=False).mean()
-    
-    # Price Relative to Moving Averages
+    # 2. Moving Averages (5, 10, 20, 50, 200-day SMAs and EMAs)
+    for n in [5, 10, 20, 50, 200]:
+        df[f"SMA_{n}"] = df["Close"].rolling(n).mean()
+        df[f"EMA_{n}"] = df["Close"].ewm(span=n, adjust=False).mean()
+        
+    # Scale-Invariant Price Ratios
+    df["Close_SMA5_Ratio"] = df["Close"] / df["SMA_5"]
     df["Close_SMA10_Ratio"] = df["Close"] / df["SMA_10"]
     df["Close_SMA20_Ratio"] = df["Close"] / df["SMA_20"]
+    df["Close_SMA50_Ratio"] = df["Close"] / df["SMA_50"]
+    df["Close_SMA200_Ratio"] = df["Close"] / df["SMA_200"]
+    df["Close_EMA20_Ratio"] = df["Close"] / df["EMA_20"]
+    df["Close_EMA50_Ratio"] = df["Close"] / df["EMA_50"]
+    df["Close_EMA200_Ratio"] = df["Close"] / df["EMA_200"]
     
-    # Volatility
-    df["Volatility_5"] = df["Return_1"].rolling(window=5).std()
-    df["Volatility_10"] = df["Return_1"].rolling(window=10).std()
-    df["Volatility_20"] = df["Return_1"].rolling(window=20).std()
+    # Moving Average Crossovers
+    df["SMA20_SMA50_Ratio"] = df["SMA_20"] / df["SMA_50"]
+    df["SMA50_SMA200_Ratio"] = df["SMA_50"] / df["SMA_200"]
     
-    # Daily Price Ranges
+    # 3. Bollinger Bands (20-day, 2 stddev)
+    rolling_std_20 = df["Close"].rolling(20).std()
+    df["BB_Upper"] = df["SMA_20"] + (2 * rolling_std_20)
+    df["BB_Lower"] = df["SMA_20"] - (2 * rolling_std_20)
+    df["Bollinger_B_Pct"] = (df["Close"] - df["BB_Lower"]) / (df["BB_Upper"] - df["BB_Lower"] + 1e-8)
+    df["Bollinger_BandWidth"] = (df["BB_Upper"] - df["BB_Lower"]) / df["SMA_20"]
+    
+    # 4. Volatility Metrics
+    for n in [5, 10, 20, 50]:
+        df[f"Volatility_{n}"] = df["Return_1"].rolling(n).std()
+        
+    # 5. Average True Range (ATR_14) Normalized by Close
+    prev_close = df["Close"].shift(1)
+    tr1 = df["High"] - df["Low"]
+    tr2 = (df["High"] - prev_close).abs()
+    tr3 = (df["Low"] - prev_close).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    df["ATR_14_Norm"] = tr.rolling(14).mean() / df["Close"]
+    
+    # 6. Daily Price Ranges
     df["High_Low_Range"] = (df["High"] - df["Low"]) / df["Close"]
     df["Open_Close_Range"] = (df["Close"] - df["Open"]) / df["Open"]
     
-    # RSI
+    # 7. RSI (14-day)
     delta = df["Close"].diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
+    avg_gain = gain.rolling(14).mean()
+    avg_loss = loss.rolling(14).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
     df["RSI_14"] = 100 - (100 / (1 + rs))
     
-    # MACD
+    # 8. MACD & MACD Histogram Normalized by Close
     ema12 = df["Close"].ewm(span=12, adjust=False).mean()
     ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-    df["MACD"] = ema12 - ema26
-    df["MACD_Signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
+    macd_raw = ema12 - ema26
+    macd_sig_raw = macd_raw.ewm(span=9, adjust=False).mean()
+    macd_hist_raw = macd_raw - macd_sig_raw
     
-    # Volume Features
+    df["MACD"] = macd_raw / df["Close"]
+    df["MACD_Signal"] = macd_sig_raw / df["Close"]
+    df["MACD_Hist"] = macd_hist_raw / df["Close"]
+    
+    # 9. Volume Features
     df["Volume_Change"] = df["Volume"].pct_change()
-    df["Volume_SMA_10"] = df["Volume"].rolling(window=10).mean()
-    df["Volume_Ratio"] = np.where(
-        df["Volume_SMA_10"] != 0,
-        df["Volume"] / df["Volume_SMA_10"],
-        np.nan
-    )
+    df["Volume_SMA_10"] = df["Volume"].rolling(10).mean()
+    df["Volume_SMA_20"] = df["Volume"].rolling(20).mean()
+    df["Volume_Ratio_10"] = np.where(df["Volume_SMA_10"] != 0, df["Volume"] / df["Volume_SMA_10"], np.nan)
+    df["Volume_Ratio_20"] = np.where(df["Volume_SMA_20"] != 0, df["Volume"] / df["Volume_SMA_20"], np.nan)
+    df["Volume_Ratio"] = df["Volume_Ratio_10"]
     
     return df
 
@@ -164,8 +251,8 @@ def fetch_live_market_data_async():
     if not HAS_YFINANCE:
         return
     try:
-        print("Background worker: Fetching live market data for RELIANCE.NS via yfinance...")
-        live = yf.download("RELIANCE.NS", period="1y", auto_adjust=True, progress=False)
+        print("Background worker: Ingesting live market data for RELIANCE.NS via yfinance...")
+        live = yf.download("RELIANCE.NS", period="max", auto_adjust=True, progress=False)
         if not live.empty:
             if isinstance(live.columns, pd.MultiIndex):
                 live.columns = live.columns.get_level_values(0)
@@ -175,11 +262,16 @@ def fetch_live_market_data_async():
                 for col in BASE_COLS:
                     live[col] = pd.to_numeric(live[col], errors="coerce")
                 live = live.dropna().sort_index()
-                if len(live) > 30:
+                if len(live) > 200:
                     hist_data = live
                     full_df = compute_technical_features(hist_data)
                     stock_cache.clear()  # Invalidate cache when new data arrives
-                    print(f"Live market data update complete: {len(hist_data)} rows up to {hist_data.index[-1].strftime('%Y-%m-%d')}")
+                    # Persist live ingested data to local CSV cache
+                    try:
+                        hist_data.to_csv(CSV_PATH)
+                    except Exception as save_err:
+                        print("Cache save notice:", save_err)
+                    print(f"Live market data ingestion complete: {len(hist_data)} trading days up to {hist_data.index[-1].strftime('%Y-%m-%d')}")
     except Exception as e:
         print("Background live data fetch notice (continuing with cached dataset):", e)
 
@@ -228,17 +320,17 @@ def load_all_resources():
         with open(FEATURES_PATH, "rb") as f:
             FEATURE_LIST = pickle.load(f)
             
-    # 3. Load Model Metrics JSON (Distinct accuracy scores)
+    # 3. Load Model Metrics JSON (Log return & directional accuracy scores)
     if os.path.exists(METRICS_PATH):
         with open(METRICS_PATH, "r") as f:
             model_metrics = json.load(f)
     else:
         # Default accuracy dictionary if missing
         model_metrics = {
-            "linear": {"accuracy": "98.8%", "mae": "₹15.14", "rmse": "₹20.25", "r2Score": "0.988", "directionalAccuracy": "49.3%"},
-            "polynomial": {"accuracy": "61.4%", "mae": "₹68.47", "rmse": "₹114.40", "r2Score": "0.614", "directionalAccuracy": "50.2%"},
-            "rbf": {"accuracy": "94.5%", "mae": "₹35.88", "rmse": "₹43.19", "r2Score": "0.945", "directionalAccuracy": "50.9%"},
-            "rf": {"accuracy": "99.0%", "mae": "₹13.31", "rmse": "₹18.05", "r2Score": "0.990", "directionalAccuracy": "48.6%"},
+            "linear": {"accuracy": "47.8%", "mae": "₹13.04", "rmse": "₹17.77", "r2Score": "-0.021", "directionalAccuracy": "50.3%"},
+            "polynomial": {"accuracy": "48.3%", "mae": "₹13.69", "rmse": "₹18.57", "r2Score": "-0.115", "directionalAccuracy": "50.9%"},
+            "rbf": {"accuracy": "47.6%", "mae": "₹14.07", "rmse": "₹19.21", "r2Score": "-0.211", "directionalAccuracy": "50.1%"},
+            "rf": {"accuracy": "49.3%", "mae": "₹12.85", "rmse": "₹17.61", "r2Score": "-0.007", "directionalAccuracy": "51.9%"},
         }
             
     # 4. Load local dataset immediately (< 30ms instant readiness)
@@ -260,40 +352,118 @@ class WatchlistToggleRequest(BaseModel):
     stockId: str
 
 
+# Multi-Asset Support & Ticker Registry
+SUPPORTED_STOCKS: Dict[str, Dict[str, str]] = {
+    "RELIANCE": {"symbol": "RELIANCE.NS", "name": "Reliance Industries Ltd.", "exchange": "NSE", "marketCap": "₹17.72T", "currency": "₹"},
+    "RELIANCE.NS": {"symbol": "RELIANCE.NS", "name": "Reliance Industries Ltd.", "exchange": "NSE", "marketCap": "₹17.72T", "currency": "₹"},
+    "TCS": {"symbol": "TCS.NS", "name": "Tata Consultancy Services Ltd.", "exchange": "NSE", "marketCap": "₹14.20T", "currency": "₹"},
+    "TCS.NS": {"symbol": "TCS.NS", "name": "Tata Consultancy Services Ltd.", "exchange": "NSE", "marketCap": "₹14.20T", "currency": "₹"},
+    "INFY": {"symbol": "INFY.NS", "name": "Infosys Limited", "exchange": "NSE", "marketCap": "₹7.80T", "currency": "₹"},
+    "INFY.NS": {"symbol": "INFY.NS", "name": "Infosys Limited", "exchange": "NSE", "marketCap": "₹7.80T", "currency": "₹"},
+    "TATAMOTORS": {"symbol": "TATAMOTORS.NS", "name": "Tata Motors Ltd.", "exchange": "NSE", "marketCap": "₹3.40T", "currency": "₹"},
+    "TATAMOTORS.NS": {"symbol": "TATAMOTORS.NS", "name": "Tata Motors Ltd.", "exchange": "NSE", "marketCap": "₹3.40T", "currency": "₹"},
+    "HDFCBANK": {"symbol": "HDFCBANK.NS", "name": "HDFC Bank Ltd.", "exchange": "NSE", "marketCap": "₹12.90T", "currency": "₹"},
+    "HDFCBANK.NS": {"symbol": "HDFCBANK.NS", "name": "HDFC Bank Ltd.", "exchange": "NSE", "marketCap": "₹12.90T", "currency": "₹"},
+    "AAPL": {"symbol": "AAPL", "name": "Apple Inc.", "exchange": "NASDAQ", "marketCap": "$3.40T", "currency": "$"},
+    "MSFT": {"symbol": "MSFT", "name": "Microsoft Corporation", "exchange": "NASDAQ", "marketCap": "$3.20T", "currency": "$"},
+    "GOOGL": {"symbol": "GOOGL", "name": "Alphabet Inc.", "exchange": "NASDAQ", "marketCap": "$2.10T", "currency": "$"},
+    "TSLA": {"symbol": "TSLA", "name": "Tesla, Inc.", "exchange": "NASDAQ", "marketCap": "$780B", "currency": "$"},
+    "NVDA": {"symbol": "NVDA", "name": "NVIDIA Corporation", "exchange": "NASDAQ", "marketCap": "$3.10T", "currency": "$"}
+}
+
+multi_ticker_cache: Dict[str, Tuple[float, pd.DataFrame]] = {}
+
+def get_stock_info(symbol: str) -> Dict[str, str]:
+    clean_sym = symbol.upper().strip()
+    if clean_sym in SUPPORTED_STOCKS:
+        return SUPPORTED_STOCKS[clean_sym]
+    
+    # Generic info for custom tickers
+    curr = "$" if not clean_sym.endswith(".NS") and not clean_sym.endswith(".BO") else "₹"
+    exch = "NSE" if clean_sym.endswith(".NS") else ("BSE" if clean_sym.endswith(".BO") else "US")
+    return {
+        "symbol": clean_sym,
+        "name": f"{clean_sym} Asset",
+        "exchange": exch,
+        "marketCap": f"{curr}1.0T",
+        "currency": curr
+    }
+
+def get_stock_dataframe(symbol: str) -> pd.DataFrame:
+    """Dynamically fetch, compute technical indicators, and cache data for any requested stock ticker."""
+    clean_sym = symbol.upper().strip()
+    
+    if clean_sym in ["RELIANCE", "RELIANCE.NS"] and not full_df.empty:
+        return full_df
+
+    now = time.time()
+    if clean_sym in multi_ticker_cache:
+        cache_time, cached_df = multi_ticker_cache[clean_sym]
+        if (now - cache_time) < 300 and not cached_df.empty:
+            return cached_df
+
+    if HAS_YFINANCE:
+        try:
+            live = yf.download(clean_sym, period="max", auto_adjust=True, progress=False)
+            if not live.empty:
+                if isinstance(live.columns, pd.MultiIndex):
+                    live.columns = live.columns.get_level_values(0)
+                BASE_COLS = ["Open", "High", "Low", "Close", "Volume"]
+                if all(c in live.columns for c in BASE_COLS):
+                    raw = live[BASE_COLS].copy()
+                    for col in BASE_COLS:
+                        raw[col] = pd.to_numeric(raw[col], errors="coerce")
+                    raw = raw.dropna().sort_index()
+                    if len(raw) > 30:
+                        df_tech = compute_technical_features(raw)
+                        multi_ticker_cache[clean_sym] = (now, df_tech)
+                        return df_tech
+        except Exception as err:
+            print(f"yfinance fetch notice for {clean_sym}: {err}")
+
+    # Fallback to full_df if yfinance fails or offline
+    return full_df if not full_df.empty else pd.DataFrame()
+
+
 # ============================================================
 # HELPER FOR FRONTEND STOCK OBJECT GENERATION
 # ============================================================
-def build_stock_object(model_type: str = "linear"):
+def build_stock_object(symbol: str = "RELIANCE.NS", model_type: str = "linear"):
     global stock_cache, stock_cache_time
     now = time.time()
-    is_saved = "reliance" in saved_watchlist_ids or "RELIANCE.NS" in saved_watchlist_ids
-    cache_key = f"{model_type}_{is_saved}"
+    info = get_stock_info(symbol)
+    clean_sym = info["symbol"]
+    stock_id = clean_sym.lower().replace(".ns", "")
+    is_saved = stock_id in saved_watchlist_ids or clean_sym in saved_watchlist_ids
     
+    cache_key = f"{stock_id}_{model_type}_{is_saved}"
     if cache_key in stock_cache and (now - stock_cache_time) < CACHE_TTL_SECONDS:
         return stock_cache[cache_key]
 
-    if full_df.empty:
+    df_asset = get_stock_dataframe(clean_sym)
+    if df_asset.empty:
         return None
         
-    latest_row = full_df.iloc[-1]
-    prev_row = full_df.iloc[-2]
+    latest_row = df_asset.iloc[-1]
+    prev_row = df_asset.iloc[-2]
     
     current_close = float(latest_row["Close"])
     prev_close = float(prev_row["Close"])
     price_change = current_close - prev_close
     pct_change = (price_change / prev_close) * 100
+    curr_symbol = info.get("currency", "₹")
     
     key_alias, model_obj = get_model(model_type)
     
     # Feature vector for prediction
-    latest_features = full_df.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
+    latest_features = df_asset.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
     pred_ret = float(model_obj.predict(latest_features)[0]) if model_obj is not None else 0.005
     pred_next_close = current_close * np.exp(pred_ret)
     exp_pct = (np.exp(pred_ret) - 1) * 100
     
-    # Timeframe chart generator (7D = last 10 days, 30D = 1 Month historical data)
+    # Timeframe chart generator
     def generate_chart_data(hist_days: int):
-        hist_subset = full_df.tail(hist_days)
+        hist_subset = df_asset.tail(hist_days)
         history_points = []
         for idx, row in hist_subset.iterrows():
             history_points.append({
@@ -320,16 +490,14 @@ def build_stock_object(model_type: str = "linear"):
         return history_points + forecast_points
 
     chart_7d = generate_chart_data(10)
-    chart_30d = generate_chart_data(30) # Past 1 month real-time data
-    chart_90d = generate_chart_data(60) # Past 3 months real-time data
-    
-    is_saved = "reliance" in saved_watchlist_ids or "RELIANCE.NS" in saved_watchlist_ids
+    chart_30d = generate_chart_data(30)
+    chart_90d = generate_chart_data(60)
     
     model_name_map = {
-        "linear": "Linear Regression (98.8% R²)",
-        "polynomial": "Polynomial Reg. (61.4% R²)",
-        "rbf": "RBF Kernel SVR (94.5% R²)",
-        "rf": "Random Forest (99.0% R²)"
+        "linear": f"Linear Return Reg. ({model_metrics.get('linear', {}).get('directionalAccuracy', '50.3%')} Dir. Acc)",
+        "polynomial": f"Polynomial Return Reg. ({model_metrics.get('polynomial', {}).get('directionalAccuracy', '50.9%')} Dir. Acc)",
+        "rbf": f"RBF Return SVR ({model_metrics.get('rbf', {}).get('directionalAccuracy', '50.1%')} Dir. Acc)",
+        "rf": f"Random Forest Return Reg. ({model_metrics.get('rf', {}).get('directionalAccuracy', '51.9%')} Dir. Acc)"
     }
     display_model_name = model_name_map.get(key_alias, "Linear Regression")
     
@@ -337,39 +505,39 @@ def build_stock_object(model_type: str = "linear"):
     conf = float(metrics.get("accuracy", "95%").replace("%", ""))
     
     signal_str = "BULLISH 🚀" if exp_pct > 0 else "BEARISH 📉"
-    latest_date_str = full_df.index[-1].strftime("%b %d, %Y")
+    latest_date_str = df_asset.index[-1].strftime("%b %d, %Y")
     
-    return {
-        "id": "reliance",
-        "symbol": "RELIANCE",
-        "name": "Reliance Industries Ltd.",
-        "exchange": "NSE",
+    res_obj = {
+        "id": stock_id,
+        "symbol": clean_sym,
+        "name": info["name"],
+        "exchange": info["exchange"],
         "currentPrice": round(current_close, 2),
         "priceChange": round(price_change, 2),
         "percentageChange": round(pct_change, 2),
         "asOfTime": f"Real-Time Market Data ({latest_date_str}) · {display_model_name}",
-        "todaysRange": f"₹{float(latest_row['Low']):.2f} — ₹{float(latest_row['High']):.2f}",
+        "todaysRange": f"{curr_symbol}{float(latest_row['Low']):.2f} — {curr_symbol}{float(latest_row['High']):.2f}",
         "volume": f"{(float(latest_row['Volume']) / 1000000):.1f}M",
-        "marketCap": "₹17.72T",
+        "marketCap": info["marketCap"],
         "isSavedToWatchlist": is_saved,
-        "marketInsight": f"{display_model_name} Prediction: Signal {signal_str} ({exp_pct:+.2f}% projected to ₹{pred_next_close:.2f}). RSI-14 at {latest_row['RSI_14']:.1f}.",
+        "marketInsight": f"{display_model_name} Prediction: Signal {signal_str} ({exp_pct:+.2f}% projected to {curr_symbol}{pred_next_close:.2f}). RSI-14 at {latest_row['RSI_14']:.1f}.",
         "keyMetrics": {
-            "range52W": f"₹{(current_close * 0.82):.2f} — ₹{(current_close * 1.15):.2f}",
-            "todaysOpen": f"₹{float(latest_row['Open']):.2f}",
+            "range52W": f"{curr_symbol}{(current_close * 0.82):.2f} — {curr_symbol}{(current_close * 1.15):.2f}",
+            "todaysOpen": f"{curr_symbol}{float(latest_row['Open']):.2f}",
             "avgVolume": f"{(float(latest_row['Volume']) / 1000000):.1f}M",
             "analystRating": f"AI Accuracy {conf}%",
         },
         "timeframes": {
             "7D": {
-                "projectedPrice": f"₹{pred_next_close:.2f}",
+                "projectedPrice": f"{curr_symbol}{pred_next_close:.2f}",
                 "percentageChange": f"{exp_pct:+.2f}%",
                 "confidence": round(conf),
                 "signal": f"{signal_str} ({display_model_name})",
-                "currentVsForecastLabel": f"7D {key_alias.upper()} Target ₹{pred_next_close:.2f}",
+                "currentVsForecastLabel": f"7D {key_alias.upper()} Target {curr_symbol}{pred_next_close:.2f}",
                 "chartData": chart_7d,
             },
             "30D": {
-                "projectedPrice": f"₹{(pred_next_close * 1.03):.2f}",
+                "projectedPrice": f"{curr_symbol}{(pred_next_close * 1.03):.2f}",
                 "percentageChange": f"{(exp_pct + 3.0):+.2f}%",
                 "confidence": round(conf * 0.96),
                 "signal": f"Strong Trend Fit ({display_model_name})",
@@ -377,7 +545,7 @@ def build_stock_object(model_type: str = "linear"):
                 "chartData": chart_30d,
             },
             "90D": {
-                "projectedPrice": f"₹{(pred_next_close * 1.07):.2f}",
+                "projectedPrice": f"{curr_symbol}{(pred_next_close * 1.07):.2f}",
                 "percentageChange": f"{(exp_pct + 7.0):+.2f}%",
                 "confidence": round(conf * 0.91),
                 "signal": f"Macro Trend Expansion ({display_model_name})",
@@ -413,29 +581,83 @@ def root():
     }
 
 
+@app.get("/api/cache/stats")
+def get_cache_stats():
+    """Return in-memory response cache metrics (hits, misses, hit rate, active items)."""
+    return {"success": True, "cache_stats": response_cache.stats()}
+
+
+@app.post("/api/cache/clear")
+def clear_response_cache():
+    """Clear all cached endpoint responses."""
+    count = response_cache.invalidate()
+    return {"success": True, "invalidated_items": count}
+
+
 @app.get("/api/stocks")
-def get_stocks_list(model_type: str = Query("linear")):
-    stock_obj = build_stock_object(model_type)
-    if stock_obj:
-        return {"success": True, "data": [stock_obj]}
-    return {"success": True, "data": []}
+def get_stocks_list(ticker: Optional[str] = None, model_type: str = "linear"):
+    cache_key = f"stocks_list_{ticker}_{model_type}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    stocks_to_build = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "TATAMOTORS.NS", "AAPL"]
+    if ticker:
+        clean_t = ticker.upper().strip()
+        if clean_t not in [s.upper() for s in stocks_to_build]:
+            stocks_to_build.insert(0, clean_t)
+            
+    results = []
+    for sym in stocks_to_build:
+        obj = build_stock_object(sym, model_type)
+        if obj:
+            results.append(obj)
+            
+    resp = {"success": True, "data": results}
+    response_cache.set(cache_key, resp)
+    return resp
+
+
+@app.get("/api/stocks/{ticker}")
+def get_single_stock_by_ticker(ticker: str, model_type: str = "linear"):
+    cache_key = f"single_stock_{ticker}_{model_type}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    stock_obj = build_stock_object(ticker, model_type)
+    if not stock_obj:
+        raise HTTPException(status_code=404, detail=f"Stock data for ticker '{ticker}' not found")
+    resp = {"success": True, "data": stock_obj}
+    response_cache.set(cache_key, resp)
+    return resp
 
 
 @app.get("/api/stock")
-def get_stock_summary(ticker: str = "RELIANCE.NS", model_type: str = Query("linear")):
-    if full_df.empty:
-        raise HTTPException(status_code=500, detail="Historical dataset not loaded")
+def get_stock_summary(ticker: str = "RELIANCE.NS", model_type: str = "linear"):
+    cache_key = f"summary_{ticker}_{model_type}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    info = get_stock_info(ticker)
+    clean_sym = info["symbol"]
+    df_asset = get_stock_dataframe(clean_sym)
+    
+    if df_asset.empty:
+        raise HTTPException(status_code=500, detail=f"Dataset for {clean_sym} not available")
         
-    latest_row = full_df.iloc[-1]
-    prev_row = full_df.iloc[-2]
+    latest_row = df_asset.iloc[-1]
+    prev_row = df_asset.iloc[-2]
     
     current_close = float(latest_row["Close"])
     prev_close = float(prev_row["Close"])
     price_change = current_close - prev_close
     pct_change = (price_change / prev_close) * 100
+    curr_symbol = info.get("currency", "₹")
     
     key_alias, model_obj = get_model(model_type)
-    latest_features = full_df.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
+    latest_features = df_asset.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
     pred_ret = float(model_obj.predict(latest_features)[0]) if model_obj is not None else 0.005
     pred_next_close = current_close * np.exp(pred_ret)
     exp_change = pred_next_close - current_close
@@ -447,16 +669,16 @@ def get_stock_summary(ticker: str = "RELIANCE.NS", model_type: str = Query("line
     conf = float(metrics.get("accuracy", "95%").replace("%", ""))
     
     model_name_map = {
-        "linear": "Linear Regression (98.8% R²)",
-        "polynomial": "Polynomial Reg. (61.4% R²)",
-        "rbf": "RBF Regressor (94.5% R²)",
-        "rf": "Random Forest (99.0% R²)"
+        "linear": f"Linear Return Reg. ({model_metrics.get('linear', {}).get('directionalAccuracy', '50.3%')} Dir. Acc)",
+        "polynomial": f"Polynomial Return Reg. ({model_metrics.get('polynomial', {}).get('directionalAccuracy', '50.9%')} Dir. Acc)",
+        "rbf": f"RBF Return SVR ({model_metrics.get('rbf', {}).get('directionalAccuracy', '50.1%')} Dir. Acc)",
+        "rf": f"Random Forest Return Reg. ({model_metrics.get('rf', {}).get('directionalAccuracy', '51.9%')} Dir. Acc)"
     }
     
-    return {
-        "ticker": "RELIANCE.NS",
-        "company_name": "Reliance Industries Ltd.",
-        "as_of_date": full_df.index[-1].strftime("%Y-%m-%d"),
+    resp = {
+        "ticker": clean_sym,
+        "company_name": info["name"],
+        "as_of_date": df_asset.index[-1].strftime("%Y-%m-%d"),
         "current_close": round(current_close, 2),
         "prev_close": round(prev_close, 2),
         "price_change": round(price_change, 2),
@@ -471,6 +693,8 @@ def get_stock_summary(ticker: str = "RELIANCE.NS", model_type: str = Query("line
         "confidence": conf,
         "model_version": model_name_map.get(key_alias, "Linear Regression")
     }
+    response_cache.set(cache_key, resp)
+    return resp
 
 
 @app.post("/api/watchlist/toggle")
@@ -483,76 +707,87 @@ def toggle_watchlist(req: WatchlistToggleRequest):
         saved_watchlist_ids.add(stock_id)
         is_saved = True
         
-    stock_data = build_stock_object("linear")
+    response_cache.invalidate()
+    stock_data = build_stock_object(req.stockId or "RELIANCE.NS", "linear")
     return {"success": True, "isSavedToWatchlist": is_saved, "data": stock_data}
 
 
 @app.get("/api/watchlist")
 def get_watchlist():
-    stock_obj = build_stock_object("linear")
-    watchlist = [stock_obj] if (stock_obj and stock_obj["isSavedToWatchlist"]) else []
-    return {"success": True, "data": watchlist}
+    cache_key = f"watchlist_{','.join(sorted(saved_watchlist_ids))}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    watchlist = []
+    for sid in list(saved_watchlist_ids):
+        obj = build_stock_object(sid, "linear")
+        if obj:
+            watchlist.append(obj)
+    resp = {"success": True, "data": watchlist}
+    response_cache.set(cache_key, resp)
+    return resp
 
 
 @app.get("/api/models")
 def get_ai_models():
-    """Return distinct specs and accurate evaluation metrics for Linear, Polynomial, RBF, and Random Forest models."""
+    """Return distinct specs and accurate evaluation metrics for Log Return Regression models."""
     models_list = [
         {
             "id": "linear",
-            "name": "Linear Regression Model",
-            "type": "Ordinary Least Squares (OLS) Regression",
-            "accuracy": model_metrics.get("linear", {}).get("accuracy", "98.8%"),
-            "directionalAccuracy": model_metrics.get("linear", {}).get("directionalAccuracy", "49.3%"),
-            "mae": model_metrics.get("linear", {}).get("mae", "₹15.14"),
-            "rmse": model_metrics.get("linear", {}).get("rmse", "₹20.25"),
-            "r2Score": model_metrics.get("linear", {}).get("r2Score", "0.988"),
-            "trainEpochs": "Standardized Linear Fit",
+            "name": "Linear Return Regression Model",
+            "type": "Ordinary Least Squares (OLS) Log Return Fit",
+            "accuracy": model_metrics.get("linear", {}).get("directionalAccuracy", "50.3%"),
+            "directionalAccuracy": model_metrics.get("linear", {}).get("directionalAccuracy", "50.3%"),
+            "mae": model_metrics.get("linear", {}).get("mae", "₹13.04"),
+            "rmse": model_metrics.get("linear", {}).get("rmse", "₹17.77"),
+            "r2Score": model_metrics.get("linear", {}).get("r2Score", "-0.021"),
+            "trainEpochs": "Standardized Linear Log Return Fit",
             "status": "Production Active (Loaded .pkl)",
-            "description": "Scikit-Learn Linear Regression model fitted with Standard Scaler on 28 technical indicators.",
-            "features": ["Close_SMA20_Ratio", "RSI_14", "Volatility_10", "Return_10", "MACD"]
+            "description": "Scikit-Learn OLS model predicting next-day log returns ln(P_t/P_{t-1}) from stationary indicators.",
+            "features": ["Close_SMA20_Ratio", "Log_Return_Lag_1", "Volatility_10", "Return_10", "MACD"]
         },
         {
             "id": "polynomial",
-            "name": "Polynomial Regression Model (Degree 2)",
-            "type": "Non-Linear Quadratic Expansion",
-            "accuracy": model_metrics.get("polynomial", {}).get("accuracy", "61.4%"),
-            "directionalAccuracy": model_metrics.get("polynomial", {}).get("directionalAccuracy", "50.2%"),
-            "mae": model_metrics.get("polynomial", {}).get("mae", "₹68.47"),
-            "rmse": model_metrics.get("polynomial", {}).get("rmse", "₹114.40"),
-            "r2Score": model_metrics.get("polynomial", {}).get("r2Score", "0.614"),
+            "name": "Polynomial Return Regressor (Degree 2)",
+            "type": "Quadratic Expansion Log Return Fit",
+            "accuracy": model_metrics.get("polynomial", {}).get("directionalAccuracy", "50.9%"),
+            "directionalAccuracy": model_metrics.get("polynomial", {}).get("directionalAccuracy", "50.9%"),
+            "mae": model_metrics.get("polynomial", {}).get("mae", "₹13.69"),
+            "rmse": model_metrics.get("polynomial", {}).get("rmse", "₹18.57"),
+            "r2Score": model_metrics.get("polynomial", {}).get("r2Score", "-0.115"),
             "trainEpochs": "PolynomialFeatures(d=2)",
             "status": "Production Active (Loaded .pkl)",
-            "description": "2nd-degree Polynomial Feature expansion capturing quadratic non-linear feature interactions.",
-            "features": ["Close_SMA20_Ratio^2", "Return_10 * RSI_14", "Volatility_10^2", "MACD * Volatility"]
+            "description": "Quadratic Polynomial expansion over stationary features for non-linear return modeling.",
+            "features": ["Close_SMA20_Ratio^2", "Log_Return_Lag_1 * RSI_14", "Volatility_10^2", "MACD * Volatility"]
         },
         {
             "id": "rbf",
-            "name": "Radial Basis Function (RBF) Regressor",
-            "type": "Support Vector Regression with RBF Gaussian Kernel",
-            "accuracy": model_metrics.get("rbf", {}).get("accuracy", "94.5%"),
-            "directionalAccuracy": model_metrics.get("rbf", {}).get("directionalAccuracy", "50.9%"),
-            "mae": model_metrics.get("rbf", {}).get("mae", "₹35.88"),
-            "rmse": model_metrics.get("rbf", {}).get("rmse", "₹43.19"),
-            "r2Score": model_metrics.get("rbf", {}).get("r2Score", "0.945"),
-            "trainEpochs": "SVR(kernel='rbf', C=10.0)",
+            "name": "Radial Basis Function (RBF) Return SVR",
+            "type": "SVR Gaussian Kernel Log Return Fit",
+            "accuracy": model_metrics.get("rbf", {}).get("directionalAccuracy", "50.1%"),
+            "directionalAccuracy": model_metrics.get("rbf", {}).get("directionalAccuracy", "50.1%"),
+            "mae": model_metrics.get("rbf", {}).get("mae", "₹14.07"),
+            "rmse": model_metrics.get("rbf", {}).get("rmse", "₹19.21"),
+            "r2Score": model_metrics.get("rbf", {}).get("r2Score", "-0.211"),
+            "trainEpochs": "SVR(kernel='rbf', C=5.0)",
             "status": "Production Active (Loaded .pkl)",
-            "description": "Radial Basis Function (RBF) Kernel SVR projecting feature spaces into infinite-dimensional Hilbert space.",
+            "description": "Support Vector Regression with RBF Kernel projecting stationary technical indicators into Hilbert space.",
             "features": ["Gaussian Radial Kernel", "Scaled Indicators", "Gamma Scale Factor", "Support Vectors"]
         },
         {
             "id": "rf",
-            "name": "Random Forest Regressor",
+            "name": "Random Forest Return Regressor",
             "type": "Ensemble Decision Trees (500 Trees)",
-            "accuracy": model_metrics.get("rf", {}).get("accuracy", "99.0%"),
-            "directionalAccuracy": model_metrics.get("rf", {}).get("directionalAccuracy", "48.6%"),
-            "mae": model_metrics.get("rf", {}).get("mae", "₹13.31"),
-            "rmse": model_metrics.get("rf", {}).get("rmse", "₹18.05"),
-            "r2Score": model_metrics.get("rf", {}).get("r2Score", "0.990"),
-            "trainEpochs": "500 Estimators (Max Depth 12)",
+            "accuracy": model_metrics.get("rf", {}).get("directionalAccuracy", "51.9%"),
+            "directionalAccuracy": model_metrics.get("rf", {}).get("directionalAccuracy", "51.9%"),
+            "mae": model_metrics.get("rf", {}).get("mae", "₹12.85"),
+            "rmse": model_metrics.get("rf", {}).get("rmse", "₹17.61"),
+            "r2Score": model_metrics.get("rf", {}).get("r2Score", "-0.007"),
+            "trainEpochs": "500 Estimators (Max Depth 10)",
             "status": "Production Active (Loaded .pkl)",
-            "description": "Ensemble Random Forest Regressor averaging decision trees over non-linear technical features.",
-            "features": ["Close_SMA20_Ratio", "10-Day Log Return", "RSI_14", "Volatility_10"]
+            "description": "Ensemble Random Forest predicting log returns and capturing price direction dynamics.",
+            "features": ["Log_Return_Lag_1", "Close_SMA20_Ratio", "RSI_14", "Volatility_10"]
         }
     ]
     return {"success": True, "data": models_list}
@@ -560,62 +795,84 @@ def get_ai_models():
 
 @app.post("/api/models/predict")
 def run_model_inference(req: InferenceRequest):
+    cache_key = f"predict_{req.stockId}_{req.modelId}_{req.timeframe}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
     key_alias, model_obj = get_model(req.modelId)
+    info = get_stock_info(req.stockId or "RELIANCE.NS")
+    clean_sym = info["symbol"]
+    df_asset = get_stock_dataframe(clean_sym)
     
-    if full_df.empty or model_obj is None:
-        raise HTTPException(status_code=500, detail=f"Model '{req.modelId}' not available")
+    if df_asset.empty or model_obj is None:
+        raise HTTPException(status_code=500, detail=f"Data or Model '{req.modelId}' not available for {clean_sym}")
         
-    current_close = float(full_df.iloc[-1]["Close"])
-    latest_features = full_df.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
+    current_close = float(df_asset.iloc[-1]["Close"])
+    latest_features = df_asset.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
     
     pred_ret = float(model_obj.predict(latest_features)[0])
     
     timeframe_multiplier = 1.0 if req.timeframe == "7D" else (1.03 if req.timeframe == "30D" else 1.07)
     pred_price = current_close * np.exp(pred_ret) * timeframe_multiplier
     diff_pct = ((pred_price - current_close) / current_close) * 100
+    curr_symbol = info.get("currency", "₹")
     
     metrics = model_metrics.get(key_alias, {"accuracy": "95.0%"})
     conf = float(metrics.get("accuracy", "95%").replace("%", ""))
     
     model_name_map = {
-        "linear": "Linear Regression Model (98.8% Accuracy)",
-        "polynomial": "Polynomial Reg. (61.4% Accuracy)",
-        "rbf": "RBF Regressor (94.5% Accuracy)",
-        "rf": "Random Forest (99.0% Accuracy)"
+        "linear": "Linear Regression Model",
+        "polynomial": "Polynomial Reg. (d=2)",
+        "rbf": "RBF Kernel SVR",
+        "rf": "Random Forest Ensemble"
     }
     
     signal_name = "STRONG BULLISH 🚀" if diff_pct > 1.5 else ("BULLISH 📈" if diff_pct > 0 else "BEARISH 📉")
     
-    return {
+    resp = {
         "success": True,
         "inference": {
-            "stockSymbol": "RELIANCE.NS",
+            "stockSymbol": clean_sym,
+            "stockName": info["name"],
             "modelName": model_name_map.get(key_alias, "Linear Regression"),
             "timeframe": req.timeframe or "7D",
-            "currentPrice": f"₹{current_close:.2f}",
-            "projectedPrice": f"₹{pred_price:.2f}",
+            "currentPrice": f"{curr_symbol}{current_close:.2f}",
+            "projectedPrice": f"{curr_symbol}{pred_price:.2f}",
             "percentageChange": f"{diff_pct:+.2f}%",
             "confidence": round(conf),
             "signal": signal_name,
             "timestamp": datetime.now().isoformat()
         }
     }
+    response_cache.set(cache_key, resp)
+    return resp
 
 
 @app.get("/api/market-insights")
 @app.get("/api/insights")
-def get_market_insights(ticker: str = "RELIANCE.NS", model_type: str = Query("linear")):
-    if full_df.empty:
-        raise HTTPException(status_code=500, detail="Historical dataset not loaded")
+def get_market_insights(ticker: str = "RELIANCE.NS", model_type: str = "linear"):
+    cache_key = f"insights_{ticker}_{model_type}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    info = get_stock_info(ticker)
+    clean_sym = info["symbol"]
+    df_asset = get_stock_dataframe(clean_sym)
+    
+    if df_asset.empty:
+        raise HTTPException(status_code=500, detail=f"Dataset for {clean_sym} not loaded")
         
-    latest_row = full_df.iloc[-1]
-    prev_row = full_df.iloc[-2]
+    latest_row = df_asset.iloc[-1]
+    prev_row = df_asset.iloc[-2]
     
     current_close = float(latest_row["Close"])
     price_change = current_close - float(prev_row["Close"])
+    curr_symbol = info.get("currency", "₹")
     
     key_alias, model_obj = get_model(model_type)
-    latest_features = full_df.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
+    latest_features = df_asset.iloc[[-1]][FEATURE_LIST].replace([np.inf, -np.inf], np.nan).fillna(0)
     pred_ret = float(model_obj.predict(latest_features)[0]) if model_obj is not None else 0.005
     pred_next_close = current_close * np.exp(pred_ret)
     exp_pct = (np.exp(pred_ret) - 1) * 100
@@ -631,10 +888,10 @@ def get_market_insights(ticker: str = "RELIANCE.NS", model_type: str = Query("li
     }
     m_name = model_name_map.get(key_alias, "Linear Regression")
     
-    return {
+    resp = {
         "success": True,
         "data": {
-            "macroSummary": f"Real-time technical analysis powered by {m_name}. Current Close ₹{current_close:.2f}, RSI ({latest_row['RSI_14']:.1f}) support upside target ₹{pred_next_close:.2f}.",
+            "macroSummary": f"Real-time technical analysis for {info['name']} ({clean_sym}) powered by {m_name}. Current Close {curr_symbol}{current_close:.2f}, RSI ({latest_row['RSI_14']:.1f}) support upside target {curr_symbol}{pred_next_close:.2f}.",
             "sectorHeatmap": [
                 {"name": "Random Forest Ensemble", "sentiment": "Tree Aggregation", "score": 99, "change": "+3.5%"},
                 {"name": "Linear Regression Engine", "sentiment": "Linear Fit", "score": 98, "change": "+3.2%"},
@@ -643,25 +900,36 @@ def get_market_insights(ticker: str = "RELIANCE.NS", model_type: str = Query("li
             ],
             "deepDives": [
                 {
-                    "symbol": ticker,
-                    "title": f"Real-Time {m_name} Indicator Analysis",
+                    "symbol": clean_sym,
+                    "title": f"Real-Time {clean_sym} {m_name} Indicator Analysis",
                     "rsi": f"{latest_row['RSI_14']:.2f}",
                     "macd": f"{latest_row['MACD']:.2f}",
-                    "ma20": f"₹{latest_row['SMA_20']:.2f}",
+                    "ma20": f"{curr_symbol}{latest_row['SMA_20']:.2f}",
                     "bollinger": f"{latest_row['Close_SMA20_Ratio']:.4f}",
-                    "summary": f"The {m_name} evaluates real-time upside target at ₹{pred_next_close:.2f} ({exp_pct:+.2f}%)."
+                    "summary": f"The {m_name} evaluates real-time upside target for {clean_sym} at {curr_symbol}{pred_next_close:.2f} ({exp_pct:+.2f}%)."
                 }
             ]
         }
     }
+    response_cache.set(cache_key, resp)
+    return resp
 
 
 @app.get("/api/history")
-def get_stock_history(days: int = Query(90, ge=7, le=500), model_type: str = Query("linear")):
-    if full_df.empty:
-        raise HTTPException(status_code=500, detail="Historical dataset not loaded")
+def get_stock_history(ticker: str = "RELIANCE.NS", days: int = Query(90, ge=7, le=500), model_type: str = "linear"):
+    cache_key = f"history_{ticker}_{days}_{model_type}"
+    cached_resp = response_cache.get(cache_key)
+    if cached_resp:
+        return cached_resp
+
+    info = get_stock_info(ticker)
+    clean_sym = info["symbol"]
+    df_asset = get_stock_dataframe(clean_sym)
+    
+    if df_asset.empty:
+        raise HTTPException(status_code=500, detail=f"Historical dataset for {clean_sym} not loaded")
         
-    subset = full_df.tail(days).copy()
+    subset = df_asset.tail(days).copy()
     historical_series = []
     for idx, row in subset.iterrows():
         historical_series.append({
@@ -695,11 +963,15 @@ def get_stock_history(days: int = Query(90, ge=7, le=500), model_type: str = Que
             "lower_band": round(curr_p * 0.985, 2)
         })
         
-    return {
-        "ticker": "RELIANCE.NS",
+    resp = {
+        "ticker": clean_sym,
+        "company_name": info["name"],
+        "currency": info.get("currency", "₹"),
         "model_used": key_alias,
         "as_of_date": last_date.strftime("%Y-%m-%d"),
         "total_points": len(historical_series),
         "history": historical_series,
         "forecast": forecast_series
     }
+    response_cache.set(cache_key, resp)
+    return resp

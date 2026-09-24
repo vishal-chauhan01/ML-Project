@@ -1,58 +1,87 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, BarChart2, Activity, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Sparkles, BarChart2, Activity, ShieldCheck, TrendingUp, Cpu } from 'lucide-react';
 
 import { apiService } from '../services/api';
 
 export const MarketInsightsPage: React.FC = () => {
+  const [activeModelType, setActiveModelType] = useState<string>('linear');
   const [insights, setInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiService.getMarketInsights().then((data) => {
+    setLoading(true);
+    apiService.getMarketInsights(activeModelType).then((data) => {
       setInsights(data);
       setLoading(false);
     });
-  }, []);
+  }, [activeModelType]);
 
-  if (loading || !insights) {
-    return (
-      <div className="py-20 text-center text-slate-400 font-medium">
-        Loading AI Market Intelligence...
-      </div>
-    );
-  }
+  const modelOptions = [
+    { id: 'linear', label: 'Linear Regression' },
+    { id: 'polynomial', label: 'Polynomial Reg.' },
+    { id: 'rbf', label: 'SVR RBF Kernel' },
+    { id: 'rf', label: 'Random Forest' },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Page Title */}
-      <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-5">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Market Insights
-          </h1>
+      {/* Page Title & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-5">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Market Insights
+            </h1>
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            AI-generated macro economics, sector sentiment, and technical indicators.
+          </p>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          AI-generated macro economics, sector sentiment, and technical indicators.
-        </p>
+
+        {/* Dynamic Model Switcher */}
+        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-xl shadow-2xs">
+          <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-400 ml-1.5 shrink-0" />
+          <div className="flex items-center gap-1 text-xs font-semibold">
+            {modelOptions.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setActiveModelType(m.id)}
+                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  activeModelType === m.id
+                    ? 'bg-purple-600 text-white font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* AI Macro Executive Summary Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="flex items-center gap-2 text-purple-300 text-xs font-semibold uppercase tracking-wider mb-2">
-          <Sparkles className="w-4 h-4" />
-          Macro Executive Intelligence
+      {loading || !insights ? (
+        <div className="py-12 text-center text-slate-400 font-medium animate-pulse">
+          Loading AI Market Intelligence for {activeModelType.toUpperCase()}...
         </div>
-        <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
-          "{insights.macroSummary}"
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-6 text-xs text-slate-400 font-medium">
-          <span>Model Update: <strong>10 min ago</strong></span>
-          <span>Market Regimes: <strong>High Conviction Expansion</strong></span>
-          <span>Global Liquidity: <strong>Positive</strong></span>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="flex items-center gap-2 text-purple-300 text-xs font-semibold uppercase tracking-wider mb-2">
+              <Sparkles className="w-4 h-4" />
+              Macro Executive Intelligence
+            </div>
+            <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
+              "{insights.macroSummary}"
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-6 text-xs text-slate-400 font-medium">
+              <span>Model Update: <strong>Live Engine</strong></span>
+              <span>Selected Engine: <strong>{activeModelType.toUpperCase()}</strong></span>
+              <span>Global Liquidity: <strong>Positive</strong></span>
+            </div>
+          </div>
 
       {/* Sector Sentiment Heatmap Grid */}
       <div className="space-y-3">
@@ -159,6 +188,8 @@ export const MarketInsightsPage: React.FC = () => {
           })}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

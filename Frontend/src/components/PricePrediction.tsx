@@ -1,5 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Sparkles, Cpu, Activity, Zap, BarChart2 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 import type { Stock, Timeframe } from '../types/stock';
 
 interface PricePredictionProps {
@@ -19,7 +29,6 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
 }) => {
   const currentForecast = stock.timeframes[activeTimeframe];
   const timeframes: Timeframe[] = ['7D', '30D', '90D'];
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const modelOptions = [
     { id: 'linear', label: 'Linear Regression', icon: Activity, tag: 'OLS Linear' },
@@ -28,75 +37,62 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
     { id: 'rf', label: 'Random Forest', icon: BarChart2, tag: 'Ensemble' },
   ];
 
-  const chartData = currentForecast.chartData;
-  const historicalPoints = chartData.filter((d) => d.historical !== undefined);
-  const forecastPoints = chartData.filter((d) => d.forecast !== undefined);
+  const currencySymbol =
+    stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance'
+      ? '₹'
+      : '$';
 
-  // Min and max values for Y-axis calculation
-  const allValues = chartData
-    .map((d) => (d.historical !== undefined ? d.historical : d.forecast!))
-    .concat(stock.currentPrice);
-  const minVal = Math.floor(Math.min(...allValues) * 0.95);
-  const maxVal = Math.ceil(Math.max(...allValues) * 1.05);
+  // Format chart data for Recharts
+  const formattedChartData = currentForecast.chartData.map((d) => ({
+    date: d.date,
+    historical: d.historical !== undefined ? d.historical : null,
+    forecast: d.forecast !== undefined ? d.forecast : null,
+    confidenceRange:
+      d.forecast !== undefined
+        ? [+(d.forecast * 0.985).toFixed(2), +(d.forecast * 1.015).toFixed(2)]
+        : null,
+  }));
 
-  const width = 600;
-  const height = 220;
-  const paddingX = 45;
-  const paddingY = 25;
+  const allVals = currentForecast.chartData
+    .flatMap((d) => [d.historical, d.forecast])
+    .filter((v): v is number => v !== undefined);
+  const minVal = Math.floor(Math.min(...allVals) * 0.96);
+  const maxVal = Math.ceil(Math.max(...allVals) * 1.04);
 
-  const getX = (index: number) => {
-    return paddingX + (index / (chartData.length - 1)) * (width - paddingX * 2);
+  // Custom Recharts Tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const histItem = payload.find((p: any) => p.dataKey === 'historical');
+      const fcItem = payload.find((p: any) => p.dataKey === 'forecast');
+
+      return (
+        <div className="bg-slate-900 border border-slate-700/80 rounded-xl p-3 shadow-xl text-white text-xs space-y-1">
+          <p className="font-semibold text-slate-400 border-b border-slate-800 pb-1">{label}</p>
+          {histItem && histItem.value !== null && (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span className="text-slate-300">Historical:</span>
+              <span className="font-bold text-blue-400">
+                {currencySymbol}
+                {Number(histItem.value).toFixed(2)}
+              </span>
+            </div>
+          )}
+          {fcItem && fcItem.value !== null && (
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+              <span className="text-slate-300">{activeModelType.toUpperCase()} Forecast:</span>
+              <span className="font-bold text-purple-400">
+                {currencySymbol}
+                {Number(fcItem.value).toFixed(2)}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
   };
-
-  const getY = (val: number) => {
-    return height - paddingY - ((val - minVal) / (maxVal - minVal)) * (height - paddingY * 2);
-  };
-
-  // Generate SVG path for historical data
-  const historicalSvgPath = historicalPoints.reduce((acc, pt, i) => {
-    const dataIndex = chartData.findIndex((d) => d.date === pt.date);
-    const x = getX(dataIndex);
-    const y = getY(pt.historical!);
-    if (i === 0) return `M ${x} ${y}`;
-    const prevPt = historicalPoints[i - 1];
-    const prevIndex = chartData.findIndex((d) => d.date === prevPt.date);
-    const prevX = getX(prevIndex);
-    const prevY = getY(prevPt.historical!);
-    const cpX1 = prevX + (x - prevX) / 2;
-    const cpX2 = prevX + (x - prevX) / 2;
-    return `${acc} C ${cpX1} ${prevY}, ${cpX2} ${y}, ${x} ${y}`;
-  }, '');
-
-  // Generate SVG path for forecast data
-  const forecastSvgPath = forecastPoints.reduce((acc, pt, i) => {
-    const dataIndex = chartData.findIndex((d) => d.date === pt.date);
-    const x = getX(dataIndex);
-    const y = getY(pt.forecast!);
-    if (i === 0) return `M ${x} ${y}`;
-    const prevPt = forecastPoints[i - 1];
-    const prevIndex = chartData.findIndex((d) => d.date === prevPt.date);
-    const prevX = getX(prevIndex);
-    const prevY = getY(prevPt.forecast!);
-    const cpX1 = prevX + (x - prevX) / 2;
-    const cpX2 = prevX + (x - prevX) / 2;
-    return `${acc} C ${cpX1} ${prevY}, ${cpX2} ${y}, ${x} ${y}`;
-  }, '');
-
-  // Generate shaded area for forecast
-  const lastForecastDataIndex = chartData.length - 1;
-  const firstForecastDataIndex = chartData.findIndex((d) => d.forecast !== undefined);
-  const forecastAreaPath =
-    forecastSvgPath +
-    ` L ${getX(lastForecastDataIndex)} ${height - paddingY}` +
-    ` L ${getX(firstForecastDataIndex)} ${height - paddingY} Z`;
-
-  // Grid Y ticks
-  const yTicks = [
-    maxVal,
-    Math.round(minVal + (maxVal - minVal) * 0.66),
-    Math.round(minVal + (maxVal - minVal) * 0.33),
-    minVal,
-  ];
 
   return (
     <div className="mb-6 space-y-4">
@@ -105,8 +101,12 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
         <div className="flex items-center gap-2">
           <Cpu className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">Active ML Model Engine</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Direct FastAPI Python ML Inference</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-none">
+              Active ML Model Engine
+            </h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+              Direct FastAPI Python ML Inference
+            </p>
           </div>
         </div>
 
@@ -117,6 +117,7 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
             return (
               <button
                 key={m.id}
+                type="button"
                 onClick={() => onSelectModelType(m.id)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
                   isSelected
@@ -124,10 +125,18 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                     : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />
+                <Icon
+                  className={`w-3.5 h-3.5 ${
+                    isSelected ? 'text-white' : 'text-blue-600 dark:text-blue-400'
+                  }`}
+                />
                 <div className="text-left">
                   <div className="leading-tight">{m.label}</div>
-                  <div className={`text-[9px] font-normal ${isSelected ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'}`}>
+                  <div
+                    className={`text-[9px] font-normal ${
+                      isSelected ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
                     {m.tag}
                   </div>
                 </div>
@@ -140,10 +149,15 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
       {/* Section Header & Timeframe Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Price prediction</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            Price prediction
+          </h2>
           <p className="text-sm text-slate-400 dark:text-slate-400">
             Historical performance and projected price range using{' '}
-            <strong className="text-blue-600 dark:text-blue-400 uppercase">{activeModelType}</strong> model
+            <strong className="text-blue-600 dark:text-blue-400 uppercase">
+              {activeModelType}
+            </strong>{' '}
+            model
           </p>
         </div>
 
@@ -154,6 +168,7 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
             return (
               <button
                 key={tf}
+                type="button"
                 onClick={() => onSelectTimeframe(tf)}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                   isActive
@@ -168,165 +183,103 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
         </div>
       </div>
 
-      {/* Grid: Chart Card + AI Forecast Card */}
+      {/* Grid: Interactive Recharts Chart Card + AI Forecast Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Chart Card */}
+        {/* Left Interactive Recharts Chart Card */}
         <div className="lg:col-span-2 min-w-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-5 shadow-xs flex flex-col justify-between transition-colors">
           {/* Legend */}
-          <div className="flex items-center justify-end gap-6 mb-2 text-xs font-semibold">
+          <div className="flex items-center justify-end gap-6 mb-3 text-xs font-semibold">
             <div className="flex items-center gap-2">
-              <span className="w-4 h-[2.5px] bg-blue-600 dark:bg-blue-400 rounded-full"></span>
-              <span className="text-slate-500 dark:text-slate-400">Historical</span>
+              <span className="w-3.5 h-[3px] bg-blue-600 rounded-full"></span>
+              <span className="text-slate-500 dark:text-slate-400">Historical Price</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-4 h-[2.5px] bg-purple-500 dark:bg-purple-400 rounded-full border-b border-dashed border-purple-500"></span>
+              <span className="w-3.5 h-[3px] bg-purple-500 border-b border-dashed border-purple-500 rounded-full"></span>
               <span className="text-slate-500 dark:text-slate-400">
                 {activeModelType.toUpperCase()} Forecast
               </span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 bg-purple-500/20 border border-purple-400/40 rounded"></span>
+              <span className="text-slate-500 dark:text-slate-400">Confidence Band</span>
+            </div>
           </div>
 
-          {/* SVG Smooth Chart Container */}
-          <div className="w-full overflow-hidden relative">
-            <svg
-              viewBox={`0 0 ${width} ${height}`}
-              className="w-full h-auto max-h-[240px] overflow-visible"
-            >
-              <defs>
-                <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.12} />
-                  <stop offset="100%" stopColor="#a855f7" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
+          {/* Recharts Container */}
+          <div className="w-full h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={formattedChartData}
+                margin={{ top: 10, right: 15, left: -15, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="purpleConfidence" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="currentColor"
+                  className="text-slate-100 dark:text-slate-800/80"
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#cbd5e1' }}
+                />
+                <YAxis
+                  domain={[minVal, maxVal]}
+                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(val) => `${currencySymbol}${val}`}
+                />
+                <Tooltip content={<CustomTooltip />} />
 
-              {/* Horizontal Grid lines & Y-ticks */}
-              {yTicks.map((tickVal, idx) => {
-                const y = getY(tickVal);
-                return (
-                  <g key={idx}>
-                    <line
-                      x1={paddingX}
-                      y1={y}
-                      x2={width - paddingX}
-                      y2={y}
-                      stroke="currentColor"
-                      className="text-slate-100 dark:text-slate-800/80"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x={paddingX - 10}
-                      y={y + 4}
-                      className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium"
-                      textAnchor="end"
-                    >
-                      {stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance' ? '₹' : '$'}{tickVal}
-                    </text>
-                  </g>
-                );
-              })}
+                {/* Prediction Confidence Band Area */}
+                <Area
+                  type="monotone"
+                  dataKey="confidenceRange"
+                  stroke="none"
+                  fill="url(#purpleConfidence)"
+                  isAnimationActive={true}
+                />
 
-              {/* Forecast Area Shading */}
-              <path d={forecastAreaPath} fill="url(#purpleGradient)" />
+                {/* Historical Solid Line */}
+                <Line
+                  type="monotone"
+                  dataKey="historical"
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#ffffff' }}
+                  activeDot={{ r: 6, fill: '#1d4ed8' }}
+                  connectNulls={true}
+                />
 
-              {/* Historical Solid Blue Line */}
-              <path
-                d={historicalSvgPath}
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
-
-              {/* Forecast Dashed Purple Line */}
-              <path
-                d={forecastSvgPath}
-                fill="none"
-                stroke="#a855f7"
-                strokeWidth="3"
-                strokeDasharray="6 6"
-                strokeLinecap="round"
-              />
-
-              {/* Points & X-Axis Labels */}
-              {chartData.map((pt, index) => {
-                const x = getX(index);
-                const val = pt.historical !== undefined ? pt.historical : pt.forecast!;
-                const y = getY(val);
-                const isHovered = hoverIndex === index;
-                const isForecast = pt.forecast !== undefined && pt.historical === undefined;
-
-                return (
-                  <g
-                    key={index}
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoverIndex(index)}
-                    onMouseLeave={() => setHoverIndex(null)}
-                  >
-                    {/* Hover indicator vertical line */}
-                    {isHovered && (
-                      <line
-                        x1={x}
-                        y1={paddingY}
-                        x2={x}
-                        y2={height - paddingY}
-                        stroke="#cbd5e1"
-                        strokeWidth="1"
-                        strokeDasharray="3 3"
-                      />
-                    )}
-
-                    {/* Point Circle */}
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={isHovered ? 6 : 4}
-                      fill={isForecast ? '#a855f7' : '#2563eb'}
-                      stroke="#ffffff"
-                      strokeWidth="2"
-                      className="transition-all duration-150"
-                    />
-
-                    {/* X-axis date label */}
-                    <text
-                      x={x}
-                      y={height - 5}
-                      className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium"
-                      textAnchor="middle"
-                    >
-                      {pt.date}
-                    </text>
-
-                    {/* Tooltip on hover */}
-                    {isHovered && (
-                      <g transform={`translate(${x - 45}, ${y - 35})`}>
-                        <rect
-                          width="90"
-                          height="26"
-                          rx="6"
-                          fill="#0f172a"
-                          className="shadow-md"
-                        />
-                        <text
-                          x="45"
-                          y="17"
-                          fill="#ffffff"
-                          fontSize="11"
-                          fontWeight="600"
-                          textAnchor="middle"
-                        >
-                          {stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance' ? '₹' : '$'}{val.toFixed(2)}
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+                {/* Forecast Dashed Line */}
+                <Line
+                  type="monotone"
+                  dataKey="forecast"
+                  stroke="#a855f7"
+                  strokeWidth={3}
+                  strokeDasharray="5 5"
+                  dot={{ r: 4, fill: '#a855f7', strokeWidth: 2, stroke: '#ffffff' }}
+                  activeDot={{ r: 6, fill: '#7e22ce' }}
+                  connectNulls={true}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Chart Footer info */}
-          <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-medium text-slate-400 dark:text-slate-500">
-            <span>Current {stock.exchange === 'NSE' || stock.symbol.endsWith('.NS') || stock.id === 'reliance' ? '₹' : '$'}{stock.currentPrice.toFixed(2)}</span>
+          <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-medium text-slate-400 dark:text-slate-500">
+            <span>
+              Current {currencySymbol}
+              {stock.currentPrice.toFixed(2)}
+            </span>
             <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{currentForecast.currentVsForecastLabel}</span>
@@ -344,7 +297,9 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white leading-tight">AI forecast</h3>
+                  <h3 className="font-bold text-slate-900 dark:text-white leading-tight">
+                    AI forecast
+                  </h3>
                   <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
                     {activeTimeframe} outlook
                   </span>
@@ -380,7 +335,9 @@ export const PricePrediction: React.FC<PricePredictionProps> = ({
 
             {/* Signal */}
             <div className="pt-1">
-              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mb-0.5">Signal</span>
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500 block mb-0.5">
+                Signal
+              </span>
               <span className="text-base font-bold text-slate-900 dark:text-white">
                 {currentForecast.signal}
               </span>

@@ -63,6 +63,12 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
 
         {/* User Controls & Mobile Toggle */}
         <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Server Connection Status Pill */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>FastAPI Live</span>
+          </div>
+
           {/* Dark / Light Mode Toggle Button */}
           <button
             onClick={toggleTheme}

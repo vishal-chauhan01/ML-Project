@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Brain,
   Zap,
@@ -12,6 +12,7 @@ import {
   Lock,
   Globe
 } from 'lucide-react';
+import { apiService } from '../services/api';
 
 interface AboutPageProps {
   onNavigateToOverview?: () => void;
@@ -22,13 +23,28 @@ export const AboutPage: React.FC<AboutPageProps> = ({
   onNavigateToOverview,
   onNavigateToModels,
 }) => {
+  const [liveModels, setLiveModels] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiService.getModels().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setLiveModels(data);
+      }
+    });
+  }, []);
+
+  const getMetricFor = (key: string, field: string, fallback: string) => {
+    const found = liveModels.find((m) => m.id === key);
+    return found ? found[field] || fallback : fallback;
+  };
+
   const mlModels = [
     {
       name: 'Linear Regression',
       type: 'Parametric Baseline',
-      accuracy: '84.2%',
-      r2: '0.842',
-      directionAcc: '68.5%',
+      accuracy: getMetricFor('linear', 'accuracy', '48.9%'),
+      r2: getMetricFor('linear', 'r2Score', '48.9%'),
+      directionAcc: getMetricFor('linear', 'directionalAccuracy', '48.9%'),
       description: 'Establishes fundamental price trajectory trends using ordinary least squares optimization on rolling temporal features.',
       badge: 'Fast & Interpretable',
       color: 'border-blue-200 bg-blue-50/50 text-blue-700'
@@ -36,9 +52,9 @@ export const AboutPage: React.FC<AboutPageProps> = ({
     {
       name: 'Polynomial Regression',
       type: 'Degree 2 Non-Linear',
-      accuracy: '88.7%',
-      r2: '0.887',
-      directionAcc: '74.1%',
+      accuracy: getMetricFor('polynomial', 'accuracy', '50.0%'),
+      r2: getMetricFor('polynomial', 'r2Score', '50.0%'),
+      directionAcc: getMetricFor('polynomial', 'directionalAccuracy', '50.0%'),
       description: 'Captures non-linear price curvature and accelerations in short-to-mid term market dynamics.',
       badge: 'Curvature Detection',
       color: 'border-purple-200 bg-purple-50/50 text-purple-700'
@@ -46,9 +62,9 @@ export const AboutPage: React.FC<AboutPageProps> = ({
     {
       name: 'Support Vector Regressor (RBF)',
       type: 'Kernel Method',
-      accuracy: '91.4%',
-      r2: '0.914',
-      directionAcc: '81.3%',
+      accuracy: getMetricFor('rbf', 'accuracy', '53.4%'),
+      r2: getMetricFor('rbf', 'r2Score', '53.4%'),
+      directionAcc: getMetricFor('rbf', 'directionalAccuracy', '53.4%'),
       description: 'Radial Basis Function kernel mapping high-dimensional feature spaces for robust resistance level predictions.',
       badge: 'High Precision',
       color: 'border-amber-200 bg-amber-50/50 text-amber-700'
@@ -56,10 +72,10 @@ export const AboutPage: React.FC<AboutPageProps> = ({
     {
       name: 'Random Forest Regressor',
       type: 'Ensemble Learning',
-      accuracy: '94.8%',
-      r2: '0.948',
-      directionAcc: '87.6%',
-      description: 'Aggregates 100 decision trees to mitigate overfitting and maximize predictive performance across volatile regimes.',
+      accuracy: getMetricFor('rf', 'accuracy', '51.5%'),
+      r2: getMetricFor('rf', 'r2Score', '51.5%'),
+      directionAcc: getMetricFor('rf', 'directionalAccuracy', '51.5%'),
+      description: 'Aggregates 500 decision trees to mitigate overfitting and maximize predictive performance across volatile regimes.',
       badge: 'Top Performer',
       color: 'border-emerald-200 bg-emerald-50/50 text-emerald-700'
     },

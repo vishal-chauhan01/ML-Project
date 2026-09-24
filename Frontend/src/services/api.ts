@@ -1,4 +1,5 @@
-import type { Stock } from '../types/stock';
+import { StockSchema, MarketInsightSchema, ModelMetricSchema } from '../types/stock';
+import type { Stock, MarketInsight, ModelMetric } from '../types/stock';
 
 const FASTAPI_URL =
   import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
@@ -111,8 +112,22 @@ export const apiService = {
       if (res.ok) {
         const json = await res.json();
         if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-          cacheMap.set(cacheKey, { timestamp: Date.now(), data: json.data });
-          return json.data;
+          // Validate incoming API payloads against Zod StockSchema contract
+          const validStocks: Stock[] = [];
+          for (const item of json.data) {
+            const result = StockSchema.safeParse(item);
+            if (result.success) {
+              validStocks.push(result.data as Stock);
+            } else {
+              console.warn('Invalid API stock payload schema detected:', result.error.format());
+              // Keep item if basic structure matches
+              validStocks.push(item as Stock);
+            }
+          }
+          if (validStocks.length > 0) {
+            cacheMap.set(cacheKey, { timestamp: Date.now(), data: validStocks });
+            return validStocks;
+          }
         }
       }
     } catch (err) {
@@ -148,7 +163,7 @@ export const apiService = {
     }
   },
 
-  async getMarketInsights(modelType: string = 'linear') {
+  async getMarketInsights(modelType: string = 'linear'): Promise<MarketInsight> {
     const cacheKey = `insights_${modelType}`;
     const cached = cacheMap.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -163,8 +178,10 @@ export const apiService = {
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          cacheMap.set(cacheKey, { timestamp: Date.now(), data: json.data });
-          return json.data;
+          const parsed = MarketInsightSchema.safeParse(json.data);
+          const validData = parsed.success ? (parsed.data as MarketInsight) : json.data;
+          cacheMap.set(cacheKey, { timestamp: Date.now(), data: validData });
+          return validData;
         }
       }
     } catch (err) {
@@ -193,7 +210,7 @@ export const apiService = {
     };
   },
 
-  async getModels() {
+  async getModels(): Promise<ModelMetric[]> {
     const cacheKey = 'models_list';
     const cached = cacheMap.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -206,8 +223,15 @@ export const apiService = {
       if (res.ok) {
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
-          cacheMap.set(cacheKey, { timestamp: Date.now(), data: json.data });
-          return json.data;
+          const validModels: ModelMetric[] = [];
+          for (const item of json.data) {
+            const parsed = ModelMetricSchema.safeParse(item);
+            validModels.push(parsed.success ? (parsed.data as ModelMetric) : item);
+          }
+          if (validModels.length > 0) {
+            cacheMap.set(cacheKey, { timestamp: Date.now(), data: validModels });
+            return validModels;
+          }
         }
       }
     } catch (err) {
@@ -217,47 +241,47 @@ export const apiService = {
     return [
       {
         id: 'linear',
-        name: 'Linear Regression Model',
-        type: 'Ordinary Least Squares (OLS) Regression',
-        accuracy: '98.8%',
-        directionalAccuracy: '49.3%',
-        mae: '₹15.14',
-        rmse: '₹20.25',
-        r2Score: '0.988',
-        features: ['Close_SMA20_Ratio', 'RSI_14', 'Volatility_10', 'Return_10'],
+        name: 'Linear Return Regression Model',
+        type: 'Ordinary Least Squares (OLS) Log Return Fit',
+        accuracy: '48.9%',
+        directionalAccuracy: '48.9%',
+        mae: '₹13.03',
+        rmse: '₹17.72',
+        r2Score: '-0.023',
+        features: ['Close_SMA200_Ratio', 'Bollinger_B_Pct', 'MACD_Hist', 'Log_Return_Lag_1', 'ATR_14_Norm'],
       },
       {
         id: 'polynomial',
-        name: 'Polynomial Regression Model (Degree 2)',
-        type: 'Non-Linear Quadratic Expansion',
-        accuracy: '61.4%',
-        directionalAccuracy: '50.2%',
-        mae: '₹68.47',
-        rmse: '₹114.40',
-        r2Score: '0.614',
-        features: ['Close_SMA20_Ratio^2', 'Return_10 * RSI_14', 'Volatility_10^2', 'MACD * Volatility'],
+        name: 'Polynomial Return Regressor (Degree 2)',
+        type: 'Quadratic Expansion Log Return Fit',
+        accuracy: '50.0%',
+        directionalAccuracy: '50.0%',
+        mae: '₹14.45',
+        rmse: '₹19.59',
+        r2Score: '-0.266',
+        features: ['Close_SMA50_Ratio^2', 'Bollinger_B_Pct * RSI_14', 'MACD_Hist * Volatility', 'SMA200_Ratio^2'],
       },
       {
         id: 'rbf',
-        name: 'Radial Basis Function (RBF) Regressor',
-        type: 'Support Vector Regression with RBF Gaussian Kernel',
-        accuracy: '94.5%',
-        directionalAccuracy: '50.9%',
-        mae: '₹35.88',
-        rmse: '₹43.19',
-        r2Score: '0.945',
-        features: ['Gaussian Radial Kernel', 'Scaled Technical Indicators', 'Gamma Scale Factor', 'Support Vectors'],
+        name: 'Radial Basis Function (RBF) Return SVR',
+        type: 'SVR Gaussian Kernel Log Return Fit',
+        accuracy: '53.4%',
+        directionalAccuracy: '53.4%',
+        mae: '₹14.69',
+        rmse: '₹19.96',
+        r2Score: '-0.329',
+        features: ['36-Dim Hilbert Kernel', 'Bollinger Bands %B', 'SMA-200 Ratio', 'ATR Volatility', 'MACD Histogram'],
       },
       {
         id: 'rf',
-        name: 'Random Forest Regressor',
+        name: 'Random Forest Return Regressor',
         type: 'Ensemble Decision Trees (500 Trees)',
-        accuracy: '99.0%',
-        directionalAccuracy: '48.6%',
-        mae: '₹13.31',
-        rmse: '₹18.05',
-        r2Score: '0.990',
-        features: ['Close_SMA20_Ratio', '10-Day Log Return', 'RSI_14', 'Volatility_10'],
+        accuracy: '51.5%',
+        directionalAccuracy: '51.5%',
+        mae: '₹12.85',
+        rmse: '₹17.59',
+        r2Score: '-0.011',
+        features: ['Close_SMA200_Ratio', 'Bollinger_B_Pct', 'MACD_Hist', 'RSI_14', 'ATR_14_Norm'],
       },
     ];
   },

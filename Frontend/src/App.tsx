@@ -5,6 +5,8 @@ import { StockOverview } from './components/StockOverview';
 import { PricePrediction } from './components/PricePrediction';
 import { MarketInsightCard } from './components/MarketInsightCard';
 import { KeyMetricsCard } from './components/KeyMetricsCard';
+import { ColdStartBanner } from './components/ColdStartBanner';
+import { SkeletonLoader } from './components/SkeletonLoader';
 import { Footer } from './components/Footer';
 import { WatchlistPage } from './pages/WatchlistPage';
 import { MarketInsightsPage } from './pages/MarketInsightsPage';
@@ -21,17 +23,41 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isWarmingUp, setIsWarmingUp] = useState<boolean>(false);
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
 
-  // Fetch stocks from FastAPI when model type or component mounts
-  useEffect(() => {
-    setLoading(true);
+  const fetchStockData = () => {
+    if (stocks.length === 0) {
+      setLoading(true);
+    }
+
+    // Set a timer to trigger warming up banner if request takes > 2.5 seconds (cold-start)
+    const warmingTimer = setTimeout(() => {
+      setIsWarmingUp(true);
+    }, 2500);
+
     apiService.getStocks(activeModelType).then((data) => {
+      clearTimeout(warmingTimer);
       if (data && data.length > 0) {
         setStocks(data);
-        setSelectedStock(data[0]);
+        setIsLiveConnected(true);
+        setIsWarmingUp(false);
+        // Preserve selected stock across model type switches
+        setSelectedStock((prevSelected) => {
+          if (!prevSelected) return data[0];
+          const matching = data.find(
+            (s) => s.id === prevSelected.id || s.symbol.toUpperCase() === prevSelected.symbol.toUpperCase()
+          );
+          return matching || data[0];
+        });
       }
       setLoading(false);
     });
+  };
+
+  // Fetch stocks from FastAPI when model type or component mounts
+  useEffect(() => {
+    fetchStockData();
   }, [activeModelType]);
 
   // Hash route listener (#overview, #watchlist, #market-insights, #models)
@@ -90,10 +116,19 @@ export function App() {
 
       {/* Main Page Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Render Free Instance Cold Start Wake-Up Banner */}
+        <ColdStartBanner
+          isWarmingUp={isWarmingUp}
+          isLiveConnected={isLiveConnected}
+          onUseCached={() => {
+            setIsWarmingUp(false);
+            setLoading(false);
+          }}
+          onRetry={fetchStockData}
+        />
+
         {loading ? (
-          <div className="py-20 text-center text-slate-400 font-medium">
-            Loading Sharewise FastAPI ML Engine Data...
-          </div>
+          <SkeletonLoader />
         ) : (
           <>
             {activeTab === 'overview' && (

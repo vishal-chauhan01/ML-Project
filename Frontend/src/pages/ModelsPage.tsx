@@ -121,17 +121,17 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
     const apiM = backendModels.find((m) => m.id === key) || {};
     const meta = defaultMeta[key] || defaultMeta.linear;
 
-    const r2Str = apiM.accuracy || (key === 'linear' ? '98.8%' : key === 'polynomial' ? '61.4%' : key === 'rbf' ? '94.5%' : '99.0%');
+    const r2Str = apiM.accuracy || apiM.directionalAccuracy || (key === 'linear' ? '48.9%' : key === 'polynomial' ? '50.0%' : key === 'rbf' ? '53.4%' : '51.5%');
     const r2Num = parseFloat(r2Str.replace('%', ''));
 
-    const dirStr = apiM.directionalAccuracy || (key === 'linear' ? '49.3%' : key === 'polynomial' ? '50.2%' : key === 'rbf' ? '50.9%' : '48.6%');
+    const dirStr = apiM.directionalAccuracy || (key === 'linear' ? '48.9%' : key === 'polynomial' ? '50.0%' : key === 'rbf' ? '53.4%' : '51.5%');
     const dirNum = parseFloat(dirStr.replace('%', ''));
 
-    const maeStr = apiM.mae || (key === 'linear' ? '₹15.14' : key === 'polynomial' ? '₹68.47' : key === 'rbf' ? '₹35.88' : '₹13.31');
+    const maeStr = apiM.mae || (key === 'linear' ? '₹13.03' : key === 'polynomial' ? '₹14.45' : key === 'rbf' ? '₹14.69' : '₹12.85');
     const maeClean = maeStr.startsWith('₹') ? maeStr : `₹${maeStr.replace('$', '')}`;
     const maeNum = parseFloat(maeClean.replace('₹', '').replace(',', ''));
 
-    const rmseStr = apiM.rmse || (key === 'linear' ? '₹20.25' : key === 'polynomial' ? '₹114.40' : key === 'rbf' ? '₹43.19' : '₹18.05');
+    const rmseStr = apiM.rmse || (key === 'linear' ? '₹17.72' : key === 'polynomial' ? '₹19.59' : key === 'rbf' ? '₹19.96' : '₹17.59');
     const rmseClean = rmseStr.startsWith('₹') ? rmseStr : `₹${rmseStr.replace('$', '')}`;
     const rmseNum = parseFloat(rmseClean.replace('₹', '').replace(',', ''));
 
@@ -487,7 +487,7 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
 
         {/* Visual Bar Graph Grid */}
         <div className="space-y-4 pt-2">
-          {benchmarkModels.map((m, idx) => {
+          {benchmarkModels.map((m) => {
             let displayVal = '';
             let pctWidth = 0;
             let isBest = false;
@@ -495,19 +495,19 @@ export const ModelsPage: React.FC<ModelsPageProps> = ({ stocks }) => {
             if (selectedMetric === 'r2') {
               displayVal = m.r2Accuracy;
               pctWidth = m.r2ScoreNum;
-              isBest = idx === 3;
+              isBest = m.id === bestR2Model?.id;
             } else if (selectedMetric === 'dir') {
               displayVal = m.directionalAccuracy;
               pctWidth = m.directionalAccuracyNum;
-              isBest = idx === 3;
+              isBest = m.id === bestDirModel?.id;
             } else if (selectedMetric === 'mae') {
               displayVal = m.mae;
               pctWidth = Math.max(10, 100 - (m.maeNum / 2.5) * 80);
-              isBest = idx === 3;
+              isBest = m.id === lowestMaeModel?.id;
             } else {
               displayVal = m.rmse;
               pctWidth = Math.max(10, 100 - (m.rmseNum / 3.0) * 80);
-              isBest = idx === 3;
+              isBest = m.id === lowestMaeModel?.id;
             }
 
             return (
