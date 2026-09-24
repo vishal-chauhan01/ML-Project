@@ -17,7 +17,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
       signal: controller.signal,
     });
     return res;
-  } finally:
+  } finally {
     clearTimeout(timeoutId);
   }
 }
