@@ -9,6 +9,8 @@ import joblib
 import json
 from datetime import datetime, timedelta
 import os
+import threading
+import time
 
 try:
     import yfinance as yf
@@ -22,7 +24,7 @@ app = FastAPI(
     version="2.2.0"
 )
 
-# Enable CORS for React frontend
+# Enable CORS for React frontend with preflight caching (1 hour)
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 if allowed_origins_env:
     origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
@@ -35,7 +37,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=3600,
 )
+
+# In-memory pre-computed cache for fast API response times (< 1ms)
+stock_cache: Dict[str, Any] = {}
+stock_cache_time: float = 0.0
+CACHE_TTL_SECONDS = 60.0
 
 # ============================================================
 # PATHS & RESOURCE LOADERS (pointing to model/ directory)
@@ -131,42 +139,49 @@ def compute_technical_features(data: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_live_market_data():
-    """Fetch real-time up-to-date market data for RELIANCE.NS via yfinance."""
+def load_local_market_data():
+    """Load local CSV dataset immediately for instant startup (< 30ms)."""
     global hist_data, full_df
-    try:
-        if HAS_YFINANCE:
-            print("Fetching live real-time market data for RELIANCE.NS via yfinance...")
-            live = yf.download("RELIANCE.NS", period="1y", auto_adjust=True, progress=False)
-            if not live.empty:
-                if isinstance(live.columns, pd.MultiIndex):
-                    live.columns = live.columns.get_level_values(0)
-                BASE_COLS = ["Open", "High", "Low", "Close", "Volume"]
-                if all(c in live.columns for c in BASE_COLS):
-                    live = live[BASE_COLS].copy()
-                    for col in BASE_COLS:
-                        live[col] = pd.to_numeric(live[col], errors="coerce")
-                    live = live.dropna().sort_index()
-                    if len(live) > 30:
-                        hist_data = live
-                        full_df = compute_technical_features(hist_data)
-                        print(f"Successfully loaded live market data: {len(hist_data)} rows up to {hist_data.index[-1].strftime('%Y-%m-%d')}")
-                        return
-    except Exception as e:
-        print("Live data fetch error (falling back to cached CSV):", e)
-        
-    # Fallback to local CSV dataset
     if os.path.exists(CSV_PATH):
-        raw = pd.read_csv(CSV_PATH, header=[0, 1], index_col=0)
-        raw.columns = raw.columns.get_level_values(0)
-        raw.index = pd.to_datetime(raw.index, errors="coerce")
-        raw = raw.dropna(how="all").sort_index()
-        for col in ["Close", "High", "Low", "Open", "Volume"]:
-            if col in raw.columns:
-                raw[col] = pd.to_numeric(raw[col], errors="coerce")
-        hist_data = raw.dropna().copy()
-        full_df = compute_technical_features(hist_data)
-        print(f"Loaded cached historical dataset: {len(hist_data)} rows")
+        try:
+            raw = pd.read_csv(CSV_PATH, header=[0, 1], index_col=0)
+            raw.columns = raw.columns.get_level_values(0)
+            raw.index = pd.to_datetime(raw.index, errors="coerce")
+            raw = raw.dropna(how="all").sort_index()
+            for col in ["Close", "High", "Low", "Open", "Volume"]:
+                if col in raw.columns:
+                    raw[col] = pd.to_numeric(raw[col], errors="coerce")
+            hist_data = raw.dropna().copy()
+            full_df = compute_technical_features(hist_data)
+            print(f"Loaded cached historical dataset instantly: {len(hist_data)} rows")
+        except Exception as e:
+            print("Error loading local dataset:", e)
+
+
+def fetch_live_market_data_async():
+    """Background worker thread to update live market data without blocking server startup."""
+    global hist_data, full_df, stock_cache
+    if not HAS_YFINANCE:
+        return
+    try:
+        print("Background worker: Fetching live market data for RELIANCE.NS via yfinance...")
+        live = yf.download("RELIANCE.NS", period="1y", auto_adjust=True, progress=False)
+        if not live.empty:
+            if isinstance(live.columns, pd.MultiIndex):
+                live.columns = live.columns.get_level_values(0)
+            BASE_COLS = ["Open", "High", "Low", "Close", "Volume"]
+            if all(c in live.columns for c in BASE_COLS):
+                live = live[BASE_COLS].copy()
+                for col in BASE_COLS:
+                    live[col] = pd.to_numeric(live[col], errors="coerce")
+                live = live.dropna().sort_index()
+                if len(live) > 30:
+                    hist_data = live
+                    full_df = compute_technical_features(hist_data)
+                    stock_cache.clear()  # Invalidate cache when new data arrives
+                    print(f"Live market data update complete: {len(hist_data)} rows up to {hist_data.index[-1].strftime('%Y-%m-%d')}")
+    except Exception as e:
+        print("Background live data fetch notice (continuing with cached dataset):", e)
 
 
 def get_model(model_type: str):
@@ -226,8 +241,11 @@ def load_all_resources():
             "rf": {"accuracy": "99.0%", "mae": "₹13.31", "rmse": "₹18.05", "r2Score": "0.990", "directionalAccuracy": "48.6%"},
         }
             
-    # 4. Load Live Market Data
-    load_live_market_data()
+    # 4. Load local dataset immediately (< 30ms instant readiness)
+    load_local_market_data()
+    
+    # 5. Launch non-blocking background thread for live yfinance fetch
+    threading.Thread(target=fetch_live_market_data_async, daemon=True).start()
 
 
 # ============================================================
@@ -246,6 +264,14 @@ class WatchlistToggleRequest(BaseModel):
 # HELPER FOR FRONTEND STOCK OBJECT GENERATION
 # ============================================================
 def build_stock_object(model_type: str = "linear"):
+    global stock_cache, stock_cache_time
+    now = time.time()
+    is_saved = "reliance" in saved_watchlist_ids or "RELIANCE.NS" in saved_watchlist_ids
+    cache_key = f"{model_type}_{is_saved}"
+    
+    if cache_key in stock_cache and (now - stock_cache_time) < CACHE_TTL_SECONDS:
+        return stock_cache[cache_key]
+
     if full_df.empty:
         return None
         
@@ -361,10 +387,20 @@ def build_stock_object(model_type: str = "linear"):
         },
     }
 
+    stock_cache[cache_key] = res_obj
+    stock_cache_time = now
+    return res_obj
+
 
 # ============================================================
 # API ENDPOINTS
 # ============================================================
+
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
 
 @app.get("/")
 def root():
